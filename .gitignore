@@ -1,7 +1,46 @@
-# Ignore Gradle project-specific cache directory
-.gradle
+# ==== Java ====
+# Compiled class files
+*.class
 
-.*
+# Package files
+*.jar
+*.war
+*.ear
+*.nar
 
-# Ignore Gradle build output directory
-build
+# HotSpot JVM crash logs
+hs_err_pid*
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# ==== Gradle ====
+.gradle/
+build/
+!gradle-wrapper.jar    # include wrapper
+
+# Ignore Gradle cache
+.gradletasknamecache
+
+# IntelliJ-specific
+.idea/
+*.iml
+
+# Eclipse-specific
+.classpath
+.project
+.settings/
+
+# VS Code workspace
+.vscode/
+*.code-workspace
+
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# CMake build directory
+bitcoinkernel/bitcoin/build/
