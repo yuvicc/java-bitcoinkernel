@@ -37,9 +37,14 @@ git subtree pull \
 
 Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md) for dependency specifics.
 
-
 ### Build
 ```bash
 ./gradlew build
 ```
+
+
+## Current Status of the Library
+see issue [milestone](https://github.com/yuvicc/java-bitcoinkernel/issues/1)
+
+
 
