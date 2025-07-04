@@ -1,7 +1,6 @@
 plugins {
     id 'java'
     id "io.github.krakowski.jextract" version "0.5.0"
-    id 'application'
 }
 
 // Define paths for Bitcoin Core
@@ -10,7 +9,7 @@ def bitcoinBuildDir = file("${bitcoinCoreDir}/build")
 def bitcoinKernelHeader = file("${bitcoinCoreDir}/src/kernel/bitcoinkernel.h")
 
 // Task to build Bitcoin Core with kernel library
-task buildBitcoinCore(type: Exec) {
+tasks.register('buildBitcoinCore', Exec) {
     workingDir bitcoinCoreDir
 
     // Configure Bitcoin Core build
@@ -22,17 +21,14 @@ task buildBitcoinCore(type: Exec) {
     inputs.file bitcoinKernelHeader
     inputs.dir "${bitcoinCoreDir}/src"
     outputs.dir bitcoinBuildDir
-
-    doFirst {
-        println "Building Bitcoin Core with kernel library..."
-    }
 }
 
 // Task to compile the built Bitcoin Core
-task compileBitcoinCore(type: Exec) {
+tasks.register('compileBitcoinCore', Exec) {
     dependsOn buildBitcoinCore
     workingDir bitcoinCoreDir
 
+    // todo: add more robust approach here for compiling parallelly, for now I have kept it low(we can use nproc here but it crashes my machine)
     commandLine 'cmake', '--build', 'build', '-j4'
 
     inputs.dir bitcoinBuildDir
@@ -40,11 +36,8 @@ task compileBitcoinCore(type: Exec) {
             "${bitcoinBuildDir}/src/kernel/libbitcoinkernel.so",
             "${bitcoinBuildDir}/src/kernel/libbitcoinkernel.dylib"  // For macOS
     )
-
-    doFirst {
-        println "Compiling Bitcoin Core kernel library..."
-    }
 }
+compileBitcoinCore.dependsOn(buildBitcoinCore)
 
 // Configure jextract to generate Java bindings
 jextract {
@@ -55,7 +48,7 @@ jextract {
                 ":${bitcoinBuildDir}/src/kernel/libbitcoinkernel.dylib"
         ]
         targetPackage = 'org.bitcoinkernel'
-        className = 'BitcoinKernel'
+        className = 'BitcoinKernelBindings'
 
         // Include directories for dependencies
         includes = [
@@ -87,50 +80,3 @@ java {
         languageVersion = JavaLanguageVersion.of(22)
     }
 }
-
-// Runtime configuration
-application {
-    mainClass = 'org.bitcoinkernel.Main'
-    applicationDefaultJvmArgs = [
-            "--enable-preview",
-            "--enable-native-access=ALL-UNNAMED",
-            // Add library path for runtime linking
-            "-Djava.library.path=${bitcoinBuildDir}/src/kernel"
-    ]
-}
-
-//// Task to check if Bitcoin Core submodule is initialized
-//task checkBitcoinCore {
-//    doLast {
-//        if (!bitcoinCoreDir.exists() || !bitcoinKernelHeader.exists()) {
-//            throw new GradleException(
-//                    "Bitcoin Core repository not found. Please ensure you've added it as a subtree:\n" +
-//                            "git subtree add --prefix=bitcoinkernel/bitcoin https://github.com/bitcoin/bitcoin.git kernel-c-api --squash"
-//            )
-//        }
-//    }
-//}
-//
-//// Make all tasks depend on Bitcoin Core check
-//tasks.matching { it.name != 'checkBitcoinCore' }.all {
-//    dependsOn checkBitcoinCore
-//}
-
-// Clean task to remove Bitcoin Core build artifacts
-//clean {
-//    delete bitcoinBuildDir
-//}
-
-// Helper task to show library information
-//task showLibraryInfo {
-//    dependsOn compileBitcoinCore
-//    doLast {
-//        println "Bitcoin Core build directory: ${bitcoinBuildDir}"
-//        println "Library files:"
-//        fileTree(bitcoinBuildDir).matching {
-//            include "**/*bitcoinkernel*"
-//        }.each { file ->
-//            println "  ${file.absolutePath}"
-//        }
-//    }
-//}
