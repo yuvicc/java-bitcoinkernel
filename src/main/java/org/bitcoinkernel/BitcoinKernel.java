@@ -20,6 +20,6 @@ public class BitcoinKernel {
     public static final int VERIFY_ALL = kernel_SCRIPT_FLAGS_VERIFY_ALL();
 
     public static void verify() {
-        
+
     }
 }
