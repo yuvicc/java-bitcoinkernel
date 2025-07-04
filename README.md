@@ -39,7 +39,7 @@ Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/
 
 ### Build
 ```bash
-./gradlew build
+./gradlew compileJava
 ```
 
 
