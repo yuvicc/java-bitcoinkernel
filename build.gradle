@@ -3,6 +3,10 @@ plugins {
     id "io.github.krakowski.jextract" version "0.5.0"
 }
 
+repositories {
+    mavenCentral()
+}
+
 // Define paths for Bitcoin Core
 def bitcoinCoreDir = file("${project.projectDir}/bitcoinkernel/bitcoin")
 def bitcoinBuildDir = file("${bitcoinCoreDir}/build")
@@ -75,8 +79,8 @@ jextract.dependsOn compileBitcoinCore
 compileJava.dependsOn jextract
 
 // Java toolchain configuration
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(22)
-    }
-}
+//java {
+//    toolchain {
+//        languageVersion = JavaLanguageVersion.of(22)
+//    }
+//}
