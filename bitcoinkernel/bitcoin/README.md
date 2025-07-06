@@ -19,7 +19,7 @@ License
 -------
 
 Bitcoin Core is released under the terms of the MIT license. See [COPYING](COPYING) for more
-information or see https://opensource.org/licenses/MIT.
+information or see https://opensource.org/license/MIT.
 
 Development Process
 -------------------
@@ -56,8 +56,8 @@ in Python.
 These tests can be run (if the [test dependencies](/test) are installed) with: `build/test/functional/test_runner.py`
 (assuming `build` is your build directory).
 
-The CI (Continuous Integration) systems make sure that every pull request is built for Windows, Linux, and macOS,
-and that unit/sanity tests are run automatically.
+The CI (Continuous Integration) systems make sure that every pull request is tested on Windows, Linux, and macOS.
+The CI must pass on all commits before merge to avoid unrelated CI failures on new pull requests.
 
 ### Manual Quality Assurance (QA) Testing
 
