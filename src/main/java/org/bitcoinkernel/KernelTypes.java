@@ -1,5 +1,7 @@
 package org.bitcoinkernel;
 
+import java.lang.foreign.MemorySegment;
+
 import static org.bitcoinkernel.BitcoinKernelBindings.*;
 
 // Enum definitions and conversions for Bitcoin Kernel
@@ -138,6 +140,27 @@ public class KernelTypes {
                 }
             }
             return CONSENSUS;
+        }
+    }
+
+    // Block Validation state
+    public static class BlockValidationState {
+        private final MemorySegment inner;
+
+        public BlockValidationState(MemorySegment inner) {
+            this.inner = inner;
+        }
+
+        public MemorySegment getInner() {
+            return inner;
+        }
+
+        public ValidationMode getMode() {
+            return ValidationMode.fromNative(kernel_get_validation_mode_from_block_validation_state(inner));
+        }
+
+        public BlockValidationResult getResult() {
+            return BlockValidationResult.fromNative(kernel_get_block_validation_result_from_block_validation_state(inner));
         }
     }
 

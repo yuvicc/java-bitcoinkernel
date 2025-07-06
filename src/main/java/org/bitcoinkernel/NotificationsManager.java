@@ -25,7 +25,7 @@ public class NotificationsManager {
 
         @FunctionalInterface
         public interface BlockCheckedCallback {
-            void blockChecked(KernelData.UnknownedBlock block, KernelTypes.ValidationMode mode, KernelTypes.KernelException.ScriptVerifyError result);
+            void blockChecked(KernelData.Block block, KernelTypes.BlockValidationState state);
         }
 
     }

@@ -79,7 +79,7 @@ public class ContextManager {
             BLOCK_CHECKED_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
                     "blockChecked",
-                    MethodType.methodType(void.class, KernelData.UnknownedBlock.class, KernelTypes.ValidationMode.class,
+                    MethodType.methodType(void.class, KernelData.Block.class, KernelTypes.BlockValidationState.class,
                             KernelTypes.KernelException.ScriptVerifyError.class)
             );
         } catch (NoSuchMethodException | IllegalAccessException e) {
@@ -120,7 +120,7 @@ public class ContextManager {
     }
 
     // Context Builder
-    public static class ContextBuilder implements AutoCloseable{
+    public static class ContextBuilder implements AutoCloseable {
         private MemorySegment inner;
         private NotificationsManager.KernelNotificationInterfaceCallbacks knCallbacks;
         private NotificationsManager.ValidationInterfaceCallbacks viCallbacks;
