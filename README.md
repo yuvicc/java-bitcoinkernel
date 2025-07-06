@@ -43,8 +43,9 @@ Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/
 ```
 
 
+## References
+- Upstream PR of C header API library -> https://github.com/bitcoin/bitcoin/pull/30595
+- [rust-bitcoinkernel wrapper](https://github.com/yuvicc/rust-bitcoinkernel)
+
 ## Current Status of the Library
 see issue [milestone](https://github.com/yuvicc/java-bitcoinkernel/issues/1)
-
-
-
