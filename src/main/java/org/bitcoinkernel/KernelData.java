@@ -266,6 +266,10 @@ public class KernelData {
             }
         }
 
+        MemorySegment getInner() {
+            return inner;
+        }
+
         @Override
         public void close() {
             kernel_block_index_destroy(inner);
@@ -275,9 +279,9 @@ public class KernelData {
     // BlockUndo
     public static class BlockUndo implements AutoCloseable {
         private final MemorySegment inner;
-        private final int nTxUndo;
+        private final long nTxUndo;
 
-        public BlockUndo(MemorySegment inner, int nTxUndo) {
+        public BlockUndo(MemorySegment inner, long nTxUndo) {
             this.inner = inner;
             this.nTxUndo = nTxUndo;
         }
