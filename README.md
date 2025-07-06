@@ -23,7 +23,7 @@ We vendor Bitcoin Core’s `libbitcoinkernel` using a Git subtree targeting the 
 
 ```bash
 git subtree pull \
-  --prefix libbitcoinkernel-sys/bitcoin \
+  --prefix bitcoinkernel/bitcoin \
   https://github.com/TheCharlatan/bitcoin \
   kernelApi --squash
 ```
