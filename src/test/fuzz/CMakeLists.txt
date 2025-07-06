@@ -71,11 +71,14 @@ add_executable(fuzz
   netaddress.cpp
   netbase_dns_lookup.cpp
   node_eviction.cpp
+  overflow.cpp
   p2p_handshake.cpp
   p2p_headers_presync.cpp
   p2p_transport_serialization.cpp
+  pcp.cpp
   package_eval.cpp
   parse_hd_keypath.cpp
+  parse_iso8601.cpp
   parse_numbers.cpp
   parse_script.cpp
   parse_univalue.cpp
@@ -121,6 +124,7 @@ add_executable(fuzz
   tx_in.cpp
   tx_out.cpp
   tx_pool.cpp
+  txgraph.cpp
   txorphan.cpp
   txrequest.cpp
   utxo_snapshot.cpp
@@ -131,6 +135,7 @@ add_executable(fuzz
 )
 target_link_libraries(fuzz
   core_interface
+  fuzzer_interface
   test_fuzz
   bitcoin_cli
   bitcoin_common

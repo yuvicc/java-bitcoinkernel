@@ -55,9 +55,11 @@ public:
         // in combination with other arguments because the parent process
         // should be able to control the child process through the IPC protocol
         // without passing information out of band.
-        if (!ParseInt32(argv[2], &fd)) {
+        const auto maybe_fd{ToIntegral<int32_t>(argv[2])};
+        if (!maybe_fd) {
             throw std::runtime_error(strprintf("Invalid -ipcfd number '%s'", argv[2]));
         }
+        fd = *maybe_fd;
         return true;
     }
     int connect(const fs::path& data_dir,
@@ -72,7 +74,7 @@ static bool ParseAddress(std::string& address,
                   struct sockaddr_un& addr,
                   std::string& error)
 {
-    if (address.compare(0, 4, "unix") == 0 && (address.size() == 4 || address[4] == ':')) {
+    if (address == "unix" || address.starts_with("unix:")) {
         fs::path path;
         if (address.size() <= 5) {
             path = data_dir / fs::PathFromString(strprintf("%s.sock", RemovePrefixView(dest_exe_name, "bitcoin-")));

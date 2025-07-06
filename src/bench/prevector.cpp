@@ -16,11 +16,11 @@ struct nontrivial_t {
     nontrivial_t() = default;
     SERIALIZE_METHODS(nontrivial_t, obj) { READWRITE(obj.x); }
 };
-static_assert(!std::is_trivially_default_constructible<nontrivial_t>::value,
+static_assert(!std::is_trivially_default_constructible_v<nontrivial_t>,
               "expected nontrivial_t to not be trivially constructible");
 
 typedef unsigned char trivial_t;
-static_assert(std::is_trivially_default_constructible<trivial_t>::value,
+static_assert(std::is_trivially_default_constructible_v<trivial_t>,
               "expected trivial_t to be trivially constructible");
 
 template <typename T>
@@ -87,6 +87,7 @@ static void PrevectorFillVectorDirect(benchmark::Bench& bench)
 {
     bench.run([&] {
         std::vector<prevector<28, T>> vec;
+        vec.reserve(260);
         for (size_t i = 0; i < 260; ++i) {
             vec.emplace_back();
         }
@@ -99,6 +100,7 @@ static void PrevectorFillVectorIndirect(benchmark::Bench& bench)
 {
     bench.run([&] {
         std::vector<prevector<28, T>> vec;
+        vec.reserve(260);
         for (size_t i = 0; i < 260; ++i) {
             // force allocation
             vec.emplace_back(29, T{});

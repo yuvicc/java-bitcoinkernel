@@ -48,15 +48,16 @@ static void AlertNotify(const std::string& strMessage)
 
 namespace node {
 
-kernel::InterruptResult KernelNotifications::blockTip(SynchronizationState state, CBlockIndex& index)
+kernel::InterruptResult KernelNotifications::blockTip(SynchronizationState state, CBlockIndex& index, double verification_progress)
 {
     {
         LOCK(m_tip_block_mutex);
+        Assume(index.GetBlockHash() != uint256::ZERO);
         m_tip_block = index.GetBlockHash();
         m_tip_block_cv.notify_all();
     }
 
-    uiInterface.NotifyBlockTip(state, &index);
+    uiInterface.NotifyBlockTip(state, index, verification_progress);
     if (m_stop_at_height && index.nHeight >= m_stop_at_height) {
         if (!m_shutdown_request()) {
             LogError("Failed to send shutdown signal after reaching stop height\n");
@@ -98,6 +99,13 @@ void KernelNotifications::fatalError(const bilingual_str& message)
     node::AbortNode(m_shutdown_on_fatal_error ? m_shutdown_request : nullptr,
                     m_exit_status, message, &m_warnings);
 }
+
+std::optional<uint256> KernelNotifications::TipBlock()
+{
+    AssertLockHeld(m_tip_block_mutex);
+    return m_tip_block;
+};
+
 
 void ReadNotificationArgs(const ArgsManager& args, KernelNotifications& notifications)
 {

@@ -34,9 +34,9 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::Bench& bench)
         explicit PrevectorJob(FastRandomContext& insecure_rand){
             p.resize(insecure_rand.randrange(PREVECTOR_SIZE*2));
         }
-        bool operator()()
+        std::optional<int> operator()()
         {
-            return true;
+            return std::nullopt;
         }
     };
 
@@ -56,13 +56,13 @@ static void CCheckQueueSpeedPrevectorJob(benchmark::Bench& bench)
 
     bench.minEpochIterations(10).batch(BATCH_SIZE * BATCHES).unit("job").run([&] {
         // Make insecure_rand here so that each iteration is identical.
-        CCheckQueueControl<PrevectorJob> control(&queue);
+        CCheckQueueControl<PrevectorJob> control(queue);
         for (auto vChecks : vBatches) {
             control.Add(std::move(vChecks));
         }
         // control waits for completion by RAII, but
         // it is done explicitly here for clarity
-        control.Wait();
+        control.Complete();
     });
 }
 BENCHMARK(CCheckQueueSpeedPrevectorJob, benchmark::PriorityLevel::HIGH);

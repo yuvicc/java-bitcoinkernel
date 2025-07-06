@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2022 The Bitcoin Core developers
+// Copyright (c) 2011-present The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,25 +14,9 @@
 #include <string_view>
 #include <univalue.h>
 
-#include <boost/date_time/posix_time/posix_time.hpp>
-
 namespace wallet {
 static const std::string WALLET_ENDPOINT_BASE = "/wallet/";
 const std::string HELP_REQUIRING_PASSPHRASE{"\nRequires wallet passphrase to be set with walletpassphrase call if wallet is encrypted.\n"};
-
-int64_t ParseISO8601DateTime(const std::string& str)
-{
-    static const boost::posix_time::ptime epoch = boost::posix_time::from_time_t(0);
-    static const std::locale loc(std::locale::classic(),
-        new boost::posix_time::time_input_facet("%Y-%m-%dT%H:%M:%SZ"));
-    std::istringstream iss(str);
-    iss.imbue(loc);
-    boost::posix_time::ptime ptime(boost::date_time::not_a_date_time);
-    iss >> ptime;
-    if (ptime.is_not_a_date_time() || epoch > ptime)
-        return 0;
-    return (ptime - epoch).total_seconds();
-}
 
 bool GetAvoidReuseFlag(const CWallet& wallet, const UniValue& param) {
     bool can_avoid_reuse = wallet.IsWalletFlagSet(WALLET_FLAG_AVOID_REUSE);
@@ -110,28 +94,6 @@ WalletContext& EnsureWalletContext(const std::any& context)
     return *wallet_context;
 }
 
-// also_create should only be set to true only when the RPC is expected to add things to a blank wallet and make it no longer blank
-LegacyScriptPubKeyMan& EnsureLegacyScriptPubKeyMan(CWallet& wallet, bool also_create)
-{
-    LegacyScriptPubKeyMan* spk_man = wallet.GetLegacyScriptPubKeyMan();
-    if (!spk_man && also_create) {
-        spk_man = wallet.GetOrCreateLegacyScriptPubKeyMan();
-    }
-    if (!spk_man) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Only legacy wallets are supported by this command");
-    }
-    return *spk_man;
-}
-
-const LegacyScriptPubKeyMan& EnsureConstLegacyScriptPubKeyMan(const CWallet& wallet)
-{
-    const LegacyScriptPubKeyMan* spk_man = wallet.GetLegacyScriptPubKeyMan();
-    if (!spk_man) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "Only legacy wallets are supported by this command");
-    }
-    return *spk_man;
-}
-
 std::string LabelFromValue(const UniValue& value)
 {
     static const std::string empty_string;
@@ -161,6 +123,7 @@ void HandleWalletError(const std::shared_ptr<CWallet> wallet, DatabaseStatus& st
         switch (status) {
             case DatabaseStatus::FAILED_NOT_FOUND:
             case DatabaseStatus::FAILED_BAD_FORMAT:
+            case DatabaseStatus::FAILED_LEGACY_DISABLED:
                 code = RPC_WALLET_NOT_FOUND;
                 break;
             case DatabaseStatus::FAILED_ALREADY_LOADED:

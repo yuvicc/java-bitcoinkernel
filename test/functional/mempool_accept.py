@@ -9,6 +9,7 @@ from decimal import Decimal
 import math
 
 from test_framework.test_framework import BitcoinTestFramework
+from test_framework.blocktools import MAX_STANDARD_TX_WEIGHT
 from test_framework.messages import (
     MAX_BIP125_RBF_SEQUENCE,
     COIN,
@@ -45,6 +46,7 @@ from test_framework.util import (
     assert_equal,
     assert_greater_than,
     assert_raises_rpc_error,
+    sync_txindex,
 )
 from test_framework.wallet import MiniWallet
 from test_framework.wallet_util import generate_keypair
@@ -67,6 +69,8 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             if "fees" in r:
                 r["fees"].pop("effective-feerate")
                 r["fees"].pop("effective-includes")
+            if "reject-details" in r:
+                r.pop("reject-details")
         assert_equal(result_expected, result_test)
         assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size)  # Must not change mempool state
 
@@ -268,6 +272,7 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
 
         self.log.info('A coinbase transaction')
         # Pick the input of the first tx we created, so it has to be a coinbase tx
+        sync_txindex(self, node)
         raw_tx_coinbase_spent = node.getrawtransaction(txid=node.decoderawtransaction(hexstring=raw_tx_in_block)['vin'][0]['txid'])
         tx = tx_from_hex(raw_tx_coinbase_spent)
         self.check_mempool_result(
@@ -322,11 +327,52 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             result_expected=[{'txid': tx.rehash(), 'allowed': False, 'reject-reason': 'dust'}],
             rawtxs=[tx.serialize().hex()],
         )
+
+        # OP_RETURN followed by non-push
         tx = tx_from_hex(raw_tx_reference)
-        tx.vout[0].scriptPubKey = CScript([OP_RETURN, b'\xff'])
-        tx.vout = [tx.vout[0]] * 2
+        tx.vout[0].scriptPubKey = CScript([OP_RETURN, OP_HASH160])
         self.check_mempool_result(
-            result_expected=[{'txid': tx.rehash(), 'allowed': False, 'reject-reason': 'multi-op-return'}],
+            result_expected=[{'txid': tx.rehash(), 'allowed': False, 'reject-reason': 'scriptpubkey'}],
+            rawtxs=[tx.serialize().hex()],
+        )
+
+        # Multiple OP_RETURN and more than 83 bytes, even if over MAX_SCRIPT_ELEMENT_SIZE
+        # are standard since v30
+        tx = tx_from_hex(raw_tx_reference)
+        tx.vout.append(CTxOut(0, CScript([OP_RETURN, b'\xff'])))
+        tx.vout.append(CTxOut(0, CScript([OP_RETURN, b'\xff' * 50000])))
+
+        self.check_mempool_result(
+            result_expected=[{'txid': tx.rehash(), 'allowed': True, 'vsize': tx.get_vsize(), 'fees': {'base': Decimal('0.05')}}],
+            rawtxs=[tx.serialize().hex()],
+            maxfeerate=0
+        )
+
+        self.log.info("A transaction with several OP_RETURN outputs.")
+        tx = tx_from_hex(raw_tx_reference)
+        op_return_count = 42
+        tx.vout[0].nValue = int(tx.vout[0].nValue / op_return_count)
+        tx.vout[0].scriptPubKey = CScript([OP_RETURN, b'\xff'])
+        tx.vout = [tx.vout[0]] * op_return_count
+        self.check_mempool_result(
+            result_expected=[{"txid": tx.rehash(), "allowed": True, "vsize": tx.get_vsize(), "fees": {"base": Decimal("0.05000026")}}],
+            rawtxs=[tx.serialize().hex()],
+        )
+
+        self.log.info("A transaction with an OP_RETURN output that bumps into the max standardness tx size.")
+        tx = tx_from_hex(raw_tx_reference)
+        tx.vout[0].scriptPubKey = CScript([OP_RETURN])
+        data_len = int(MAX_STANDARD_TX_WEIGHT / 4) - tx.get_vsize() - 5 - 4  # -5 for PUSHDATA4 and -4 for script size
+        tx.vout[0].scriptPubKey = CScript([OP_RETURN, b"\xff" * (data_len)])
+        assert_equal(tx.get_vsize(), int(MAX_STANDARD_TX_WEIGHT / 4))
+        self.check_mempool_result(
+            result_expected=[{"txid": tx.rehash(), "allowed": True, "vsize": tx.get_vsize(), "fees": {"base": Decimal("0.1") - Decimal("0.05")}}],
+            rawtxs=[tx.serialize().hex()],
+        )
+        tx.vout[0].scriptPubKey = CScript([OP_RETURN, b"\xff" * (data_len + 1)])
+        assert_greater_than(tx.get_vsize(), int(MAX_STANDARD_TX_WEIGHT / 4))
+        self.check_mempool_result(
+            result_expected=[{"txid": tx.rehash(), "allowed": False, "reject-reason": "tx-size"}],
             rawtxs=[tx.serialize().hex()],
         )
 

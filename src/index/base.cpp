@@ -17,9 +17,14 @@
 #include <util/string.h>
 #include <util/thread.h>
 #include <util/translation.h>
-#include <validation.h> // For g_chainman
+#include <validation.h>
 
+#include <chrono>
+#include <memory>
+#include <optional>
+#include <stdexcept>
 #include <string>
+#include <thread>
 #include <utility>
 
 constexpr uint8_t DB_BEST_BLOCK{'B'};
@@ -106,7 +111,7 @@ bool BaseIndex::Init()
         // best chain, we will rewind to the fork point during index sync
         const CBlockIndex* locator_index{m_chainstate->m_blockman.LookupBlockIndex(locator.vHave.at(0))};
         if (!locator_index) {
-            return InitError(strprintf(Untranslated("%s: best block of the index not found. Please rebuild the index."), GetName()));
+            return InitError(Untranslated(strprintf("%s: best block of the index not found. Please rebuild the index.", GetName())));
         }
         SetBestBlockIndex(locator_index);
     }
@@ -188,7 +193,7 @@ void BaseIndex::Sync()
 
             CBlock block;
             interfaces::BlockInfo block_info = kernel::MakeBlockInfo(pindex);
-            if (!m_chainstate->m_blockman.ReadBlockFromDisk(block, *pindex)) {
+            if (!m_chainstate->m_blockman.ReadBlock(block, *pindex)) {
                 FatalErrorf("%s: Failed to read block %s from disk",
                            __func__, pindex->GetBlockHash().ToString());
                 return;
@@ -256,7 +261,7 @@ bool BaseIndex::Rewind(const CBlockIndex* current_tip, const CBlockIndex* new_ti
     // In the case of a reorg, ensure persisted block locator is not stale.
     // Pruning has a minimum of 288 blocks-to-keep and getting the index
     // out of sync may be possible but a users fault.
-    // In case we reorg beyond the pruned depth, ReadBlockFromDisk would
+    // In case we reorg beyond the pruned depth, ReadBlock would
     // throw and lead to a graceful shutdown
     SetBestBlockIndex(new_tip);
     if (!Commit()) {

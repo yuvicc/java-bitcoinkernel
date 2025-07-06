@@ -30,6 +30,7 @@ def assert_mempool_contents(test_framework, node, expected=None, sync=True):
         test_framework.sync_mempools()
     if not expected:
         expected = []
+    assert_equal(len(expected), len(set(expected)))
     mempool = node.getrawmempool(verbose=False)
     assert_equal(len(mempool), len(expected))
     for tx in expected:
@@ -40,7 +41,7 @@ def fill_mempool(test_framework, node, *, tx_sync_fun=None):
     """Fill mempool until eviction.
 
     Allows for simpler testing of scenarios with floating mempoolminfee > minrelay
-    Requires -datacarriersize=100000 and -maxmempool=5 and assumes -minrelaytxfee
+    Requires -maxmempool=5 and assumes -minrelaytxfee
     is 1 sat/vbyte.
     To avoid unintentional tx dependencies, the mempool filling txs are created with a
     tagged ephemeral miniwallet instance.

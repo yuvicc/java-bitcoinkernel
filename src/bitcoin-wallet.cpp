@@ -26,7 +26,7 @@
 
 using util::Join;
 
-const std::function<std::string(const char*)> G_TRANSLATION_FUN = nullptr;
+const TranslateFn G_TRANSLATION_FUN{nullptr};
 
 static void SetupWalletToolArgs(ArgsManager& argsman)
 {
@@ -34,19 +34,14 @@ static void SetupWalletToolArgs(ArgsManager& argsman)
     SetupChainParamsBaseOptions(argsman);
 
     argsman.AddArg("-version", "Print version and exit", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
+    argsman.AddArg("-datadir=<dir>", "Specify data directory", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::OPTIONS);
     argsman.AddArg("-wallet=<wallet-name>", "Specify wallet name", ArgsManager::ALLOW_ANY | ArgsManager::NETWORK_ONLY, OptionsCategory::OPTIONS);
     argsman.AddArg("-dumpfile=<file name>", "When used with 'dump', writes out the records to this file. When used with 'createfromdump', loads the records into a new wallet.", ArgsManager::ALLOW_ANY | ArgsManager::DISALLOW_NEGATION, OptionsCategory::OPTIONS);
     argsman.AddArg("-debug=<category>", "Output debugging information (default: 0).", ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
-    argsman.AddArg("-descriptors", "Create descriptors wallet. Only for 'create'", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-legacy", "Create legacy wallet. Only for 'create'", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
-    argsman.AddArg("-format=<format>", "The format of the wallet file to create. Either \"bdb\" or \"sqlite\". Only used with 'createfromdump'", ArgsManager::ALLOW_ANY, OptionsCategory::OPTIONS);
     argsman.AddArg("-printtoconsole", "Send trace/debug info to console (default: 1 when no -debug is true, 0 otherwise).", ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
-    argsman.AddArg("-withinternalbdb", "Use the internal Berkeley DB parser when dumping a Berkeley DB wallet file (default: false)", ArgsManager::ALLOW_ANY, OptionsCategory::DEBUG_TEST);
 
     argsman.AddCommand("info", "Get wallet info");
-    argsman.AddCommand("create", "Create new wallet file");
-    argsman.AddCommand("salvage", "Attempt to recover private keys from a corrupt wallet. Warning: 'salvage' is experimental.");
+    argsman.AddCommand("create", "Create a new descriptor wallet file");
     argsman.AddCommand("dump", "Print out all of the wallet key-value records");
     argsman.AddCommand("createfromdump", "Create new wallet file from dumped records");
 }
@@ -60,10 +55,10 @@ static std::optional<int> WalletAppInit(ArgsManager& args, int argc, char* argv[
         return EXIT_FAILURE;
     }
     const bool missing_args{argc < 2};
-    if (missing_args || HelpRequested(args) || args.IsArgSet("-version")) {
+    if (missing_args || HelpRequested(args) || args.GetBoolArg("-version", false)) {
         std::string strUsage = strprintf("%s bitcoin-wallet utility version", CLIENT_NAME) + " " + FormatFullVersion() + "\n";
 
-        if (args.IsArgSet("-version")) {
+        if (args.GetBoolArg("-version", false)) {
             strUsage += FormatParagraph(LicenseInfo());
         } else {
             strUsage += "\n"
