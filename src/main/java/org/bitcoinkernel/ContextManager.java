@@ -82,7 +82,7 @@ public class ContextManager {
                     MethodType.methodType(void.class, KernelData.UnknownedBlock.class, KernelTypes.ValidationMode.class,
                             KernelTypes.KernelException.ScriptVerifyError.class)
             );
-        } catch (NoSuchMethodException || IllegalAccessException e) {
+        } catch (NoSuchMethodException | IllegalAccessException e) {
             throw new ExceptionInInitializerError(e);
         }
     }
@@ -92,18 +92,15 @@ public class ContextManager {
         private final MemorySegment inner;
         private final NotificationsManager.KernelNotificationInterfaceCallbacks knCallbacks;
         private final NotificationsManager.ValidationInterfaceCallbacks viCallbacks;
-        private final MemorySegment validationInterface;
         private final Arena callBackArena;
 
         public Context(MemorySegment inner,
                        NotificationsManager.KernelNotificationInterfaceCallbacks knCallbacks,
                        NotificationsManager.ValidationInterfaceCallbacks viCallbacks,
-                       MemorySegment validationInterface,
                        Arena callBackArena) {
             this.inner = inner;
             this.knCallbacks = knCallbacks;
             this.viCallbacks = viCallbacks;
-            this.validationInterface = validationInterface;
             this.callBackArena = callBackArena;
         }
 
@@ -117,11 +114,8 @@ public class ContextManager {
 
         @Override
         public void close() {
-            if (validationInterface != null) {
-                kernel_validation_interface_unregister(inner, validationInterface);
-                kernel_validation_interface_destroy(validationInterface);
-            }
             kernel_context_destroy(inner);
+            callBackArena.close();
         }
     }
 
@@ -215,18 +209,7 @@ public class ContextManager {
                         callbackArena
                 );
                 holder.set(ValueLayout.ADDRESS, ValueLayout.ADDRESS.byteSize(), blockCheckStub);
-                MemorySegment validationInterface = kernel_validation_interface_create(holder);
-                if (validationInterface == MemorySegment.NULL) {
-                    throw new KernelTypes.KernelException("Failed to create validation interface");
-                }
-                boolean success = kernel_validation_interface_register(inner, validationInterface);
-                if (!success) {
-                    kernel_validation_interface_destroy(validationInterface);
-                    throw new KernelTypes.KernelException("Failed to register validation interface");
-                }
-                this.viCallbacks = new NotificationsManager.ValidationInterfaceCallbacks(callbacks.blockChecked) {
-                    public final MemorySegment validationInterfacePtr = validationInterface;
-                };
+                kernel_context_options_set_validation_interface(inner, holder);
             }
             return this;
         }
@@ -236,12 +219,8 @@ public class ContextManager {
             if (contextInner == MemorySegment.NULL) {
                 throw new KernelTypes.KernelException("Failed to create context");
             }
-            MemorySegment validationInterface = (viCallbacks != null && viCallbacks instanceof
-                    NotificationsManager.ValidationInterfaceCallbacks) ?
-                    ((NotificationsManager.ValidationInterfaceCallbacks) viCallbacks).validationInterfacePtr
-                    : null;
             kernel_context_options_destroy(inner);
-            return new Context(contextInner, knCallbacks, viCallbacks, validationInterface, callbackArena);
+            return new Context(contextInner, knCallbacks, viCallbacks, callbackArena);
         }
 
         @Override

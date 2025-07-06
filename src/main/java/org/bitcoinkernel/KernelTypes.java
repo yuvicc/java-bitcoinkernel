@@ -119,7 +119,6 @@ public class KernelTypes {
         MISSING_PREV(kernel_BLOCK_MISSING_PREV()),
         INVALID_PREV(kernel_BLOCK_INVALID_PREV()),
         TIME_FUTURE(kernel_BLOCK_TIME_FUTURE()),
-        CHECKPOINT(kernel_BLOCK_CHECKPOINT()),
         HEADER_LOW_WORK(kernel_BLOCK_HEADER_LOW_WORK());
 
         private final int nativeValue;
