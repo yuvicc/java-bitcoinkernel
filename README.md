@@ -12,9 +12,8 @@ This library is **alpha**—under work in progress. APIs may change and function
 
 ### Features
 
-- Full block and transaction validation using Bitcoin Core’s validation engine
-- Read block metadata (height, timestamp, hash)
-- Block data parsing and inspection
+- Transaction validation using Bitcoin Core’s validation engine
+- Block validation - todo
 - Clean Java-native bindings via FFM with minimal overhead
 
 ## Building
