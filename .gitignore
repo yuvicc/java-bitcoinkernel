@@ -1,46 +1,23 @@
-# ==== Java ====
-# Compiled class files
-*.class
+# Build subdirectories.
+/*build*
+!/build-aux
+!/build_msvc
 
-# Package files
-*.jar
-*.war
-*.ear
-*.nar
+*.pyc
 
-# HotSpot JVM crash logs
-hs_err_pid*
+# Only ignore unexpected patches
+*.patch
+!contrib/guix/patches/*.patch
+!depends/patches/**/*.patch
 
-# Mobile Tools for Java (J2ME)
-.mtj.tmp/
+/CMakeUserPresets.json
 
-# ==== Gradle ====
-.gradle/
-build/
-!gradle-wrapper.jar    # include wrapper
+# Previous releases
+/releases
 
-# Ignore Gradle cache
-.gradletasknamecache
+#build tests
+test/lint/test_runner/target/
 
-# IntelliJ-specific
-.idea/
-*.iml
+/guix-build-*
 
-# Eclipse-specific
-.classpath
-.project
-.settings/
-
-# VS Code workspace
-.vscode/
-*.code-workspace
-
-# OS-specific
-.DS_Store
-Thumbs.db
-
-# Log files
-*.log
-
-# CMake build directory
-bitcoinkernel/bitcoin/build/
+/ci/scratch/

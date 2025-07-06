@@ -1,3 +1,7 @@
+// Copyright (c) 2022-present The Bitcoin Core developers
+// Distributed under the MIT software license, see the accompanying
+// file COPYING or https://opensource.org/license/mit.
+
 #include <arith_uint256.h>
 #include <chain.h>
 #include <chainparams.h>
@@ -48,6 +52,7 @@ public:
 
 FUZZ_TARGET(headers_sync_state, .init = initialize_headers_sync_state_fuzz)
 {
+    SeedRandomStateForTest(SeedRand::ZEROS);
     FuzzedDataProvider fuzzed_data_provider(buffer.data(), buffer.size());
     auto mock_time{ConsumeTime(fuzzed_data_provider)};
 

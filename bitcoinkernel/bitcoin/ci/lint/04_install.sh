@@ -12,10 +12,11 @@ pushd "/"
 
 ${CI_RETRY_EXE} apt-get update
 # Lint dependencies:
+# - cargo (used to run the lint tests)
 # - curl/xz-utils (to install shellcheck)
 # - git (used in many lint scripts)
 # - gpg (used by verify-commits)
-${CI_RETRY_EXE} apt-get install -y curl xz-utils git gpg
+${CI_RETRY_EXE} apt-get install -y cargo curl xz-utils git gpg
 
 PYTHON_PATH="/python_build"
 if [ ! -d "${PYTHON_PATH}/bin" ]; then
@@ -35,19 +36,8 @@ export PATH="${PYTHON_PATH}/bin:${PATH}"
 command -v python3
 python3 --version
 
-export LINT_RUNNER_PATH="/lint_test_runner"
-if [ ! -d "${LINT_RUNNER_PATH}" ]; then
-  ${CI_RETRY_EXE} apt-get install -y cargo
-  (
-    cd "/test/lint/test_runner" || exit 1
-    cargo build
-    mkdir -p "${LINT_RUNNER_PATH}"
-    mv target/debug/test_runner "${LINT_RUNNER_PATH}"
-  )
-fi
-
 ${CI_RETRY_EXE} pip3 install \
-  codespell==2.2.6 \
+  codespell==2.4.1 \
   lief==0.13.2 \
   mypy==1.4.1 \
   pyzmq==25.1.0 \
@@ -59,7 +49,7 @@ curl -sL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_
     tar --xz -xf - --directory /tmp/
 mv "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/bin/
 
-MLC_VERSION=v0.18.0
+MLC_VERSION=v0.19.0
 MLC_BIN=mlc-x86_64-linux
 curl -sL "https://github.com/becheran/mlc/releases/download/${MLC_VERSION}/${MLC_BIN}" -o "/usr/bin/mlc"
 chmod +x /usr/bin/mlc

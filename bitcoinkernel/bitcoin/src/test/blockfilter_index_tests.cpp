@@ -67,8 +67,9 @@ CBlock BuildChainTestingSetup::CreateBlock(const CBlockIndex* prev,
     const std::vector<CMutableTransaction>& txns,
     const CScript& scriptPubKey)
 {
-     BlockAssembler::Options options;
-    std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler{m_node.chainman->ActiveChainstate(), m_node.mempool.get(), options}.CreateNewBlock(scriptPubKey);
+    BlockAssembler::Options options;
+    options.coinbase_output_script = scriptPubKey;
+    std::unique_ptr<CBlockTemplate> pblocktemplate = BlockAssembler{m_node.chainman->ActiveChainstate(), m_node.mempool.get(), options}.CreateNewBlock();
     CBlock& block = pblocktemplate->block;
     block.hashPrevBlock = prev->GetBlockHash();
     block.nTime = prev->nTime + 1;
@@ -80,6 +81,7 @@ CBlock BuildChainTestingSetup::CreateBlock(const CBlockIndex* prev,
     }
     {
         CMutableTransaction tx_coinbase{*block.vtx.at(0)};
+        tx_coinbase.nLockTime = static_cast<uint32_t>(prev->nHeight);
         tx_coinbase.vin.at(0).scriptSig = CScript{} << prev->nHeight + 1;
         block.vtx.at(0) = MakeTransactionRef(std::move(tx_coinbase));
         block.hashMerkleRoot = BlockMerkleRoot(block);
