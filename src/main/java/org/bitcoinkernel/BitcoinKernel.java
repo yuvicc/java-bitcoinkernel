@@ -7,7 +7,7 @@ import java.util.List;
 import static org.bitcoinkernel.BitcoinKernelBindings.*;
 
 // This serves as the entry point for the library
-public class BitcoinKernel {
+public class BitcoinKernel implements AutoCloseable {
 
     // Script Verification Flags
     public static final int VERIFY_NONE = kernel_SCRIPT_FLAGS_VERIFY_NONE();
@@ -40,43 +40,48 @@ public class BitcoinKernel {
                     .notificationCallbacks(new NotificationsManager.KernelNotificationInterfaceCallbacks(
                     ) {
                         @Override
-                        public void blockTip(int state, KernelData.BlockIndex blockIndex, double verificationProgress) {
-
+                        public void blockTip(int state, MemorySegment blockIndex, double verificationProgress) {
+                            logger.log("Block tip: state=" + state + ", progress=" + verificationProgress + ", blockIndex=" + new KernelData.BlockIndex(blockIndex).height());
                         }
 
                         @Override
                         public void headerTip(int state, long height, long timestamp, boolean presync) {
-
+                            logger.log("Header tip: height=" + height + ", presync=" + presync);
                         }
 
                         @Override
-                        public void progress(String title, int progressPercent, boolean resumePossible) {
-
+                        public void progress(MemorySegment title, int progressPercent, boolean resumePossible) {
+                            logger.log("Progress: " + title.getString(0) + " " + progressPercent + "%");
                         }
 
                         @Override
-                        public void warningSet(int warning, String message) {
-
+                        public void warningSet(int warning, MemorySegment message) {
+                            logger.log("Warning: " + message.getString(0));
                         }
 
                         @Override
-                        public void warningUnset(int warning, String message) {
-
+                        public void warningUnset(int warning) {
+                            logger.log("Warning Unset: " + warning);
                         }
 
                         @Override
-                        public void flushError(String message) {
-
+                        public void flushError(MemorySegment message) {
+                            logger.log("Flush error: " + message.getString(0));
                         }
 
                         @Override
-                        public void fatalError(String message) {
-
+                        public void fatalError(MemorySegment message) {
+                            logger.log("Fatal error: " + message.getString(0));
                         }
                     })
-                    .validationiInterface(new NotificationsManager.ValidationInterfaceCallbacks(
-                            (block, state) -> logger.log("Block Checked: mode=" + state.getMode() + ", result=" + state.getResult())
-                    ))
+                    .validationiInterface(new NotificationsManager.ValidationInterfaceCallbacks() {
+                        @Override
+                        public void blockChecked(MemorySegment blockPtr, MemorySegment statePtr) {
+                            KernelData.Block block = new KernelData.Block(blockPtr);
+                            KernelTypes.BlockValidationState state = new KernelTypes.BlockValidationState(statePtr);
+                            logger.log("Block checked mode=" + state.getMode() + ", Result: " + state.getResult());
+                        }
+                    })
                     .build();
         }
 
@@ -144,6 +149,11 @@ public class BitcoinKernel {
         }
     }
 
+    @Override
+    public void close() {
+        kernel_chainstate_manager_destroy(chainstateManager, context.getInner());
+        context.close();
+    }
 
 }
 

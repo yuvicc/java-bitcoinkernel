@@ -6,8 +6,6 @@ import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
 import static org.bitcoinkernel.BitcoinKernelBindings.*;
-import static org.bitcoinkernel.kernel_ValidationInterfaceCallbacks.*;
-import static org.bitcoinkernel.kernel_NotificationInterfaceCallbacks.*;
 
 public class ContextManager {
     // Structs for Validation Callbacks Layout
@@ -40,11 +38,10 @@ public class ContextManager {
 
     static {
         try {
-            Linker linker = Linker.nativeLinker();
             BLOCK_TIP_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
                     "blockTip",
-                    MethodType.methodType(void.class, int.class, KernelData.BlockIndex.class, double.class)
+                    MethodType.methodType(void.class, int.class, MemorySegment.class, double.class)
             );
             HEADER_TIP_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
@@ -54,12 +51,12 @@ public class ContextManager {
             PROGRESS_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
                     "progress",
-                    MethodType.methodType(void.class, String.class, int.class, boolean.class)
+                    MethodType.methodType(void.class, MemorySegment.class, int.class, boolean.class)
             );
             WARNING_SET_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
                     "warningSet",
-                    MethodType.methodType(void.class, int.class, String.class)
+                    MethodType.methodType(void.class, int.class, MemorySegment.class)
             );
             WARNING_UNSET_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
@@ -69,18 +66,17 @@ public class ContextManager {
             FATAL_ERROR_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
                     "fatalError",
-                    MethodType.methodType(void.class, String.class)
+                    MethodType.methodType(void.class, MemorySegment.class)
             );
             FLUSH_ERROR_MH = MethodHandles.lookup().findVirtual(
                     NotificationsManager.KernelNotificationInterfaceCallbacks.class,
                     "flushError",
-                    MethodType.methodType(void.class, String.class)
+                    MethodType.methodType(void.class, MemorySegment.class)
             );
             BLOCK_CHECKED_MH = MethodHandles.lookup().findVirtual(
-                    NotificationsManager.KernelNotificationInterfaceCallbacks.class,
+                    NotificationsManager.ValidationInterfaceCallbacks.class,
                     "blockChecked",
-                    MethodType.methodType(void.class, KernelData.Block.class, KernelTypes.BlockValidationState.class,
-                            KernelTypes.KernelException.ScriptVerifyError.class)
+                    MethodType.methodType(void.class, MemorySegment.class, MemorySegment.class)
             );
         } catch (NoSuchMethodException | IllegalAccessException e) {
             throw new ExceptionInInitializerError(e);
@@ -125,6 +121,7 @@ public class ContextManager {
         private NotificationsManager.KernelNotificationInterfaceCallbacks knCallbacks;
         private NotificationsManager.ValidationInterfaceCallbacks viCallbacks;
         private final Arena callbackArena;
+        private boolean built = false;
 
         public ContextBuilder() throws KernelTypes.KernelException {
             this.callbackArena = Arena.ofConfined();
@@ -152,37 +149,37 @@ public class ContextManager {
                 holder.set(ValueLayout.ADDRESS, 0, MemorySegment.ofAddress(System.identityHashCode(callBacks)));
                 MemorySegment blockTipStub = Linker.nativeLinker().upcallStub(
                         BLOCK_TIP_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE),
+                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE),
                         callbackArena
                 );
                 MemorySegment headerTipStub = Linker.nativeLinker().upcallStub(
                         HEADER_TIP_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_BOOLEAN),
+                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_BOOLEAN),
                         callbackArena
                 );
                 MemorySegment progressStub = Linker.nativeLinker().upcallStub(
                         PROGRESS_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN),
+                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN),
                         callbackArena
                 );
                 MemorySegment warningSetStub = Linker.nativeLinker().upcallStub(
                         WARNING_SET_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.ADDRESS),
                         callbackArena
                 );
                 MemorySegment warningUnsetStub = Linker.nativeLinker().upcallStub(
                         WARNING_UNSET_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT),
                         callbackArena
                 );
                 MemorySegment flushErrorStub = Linker.nativeLinker().upcallStub(
                         FLUSH_ERROR_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS),
                         callbackArena
                 );
                 MemorySegment fatalErrorStub = Linker.nativeLinker().upcallStub(
                         FATAL_ERROR_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_INT),
+                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS),
                         callbackArena
                 );
                 holder.set(ValueLayout.ADDRESS, ValueLayout.ADDRESS.byteSize(), blockTipStub);
@@ -199,18 +196,16 @@ public class ContextManager {
 
         public ContextBuilder validationiInterface(NotificationsManager.ValidationInterfaceCallbacks callbacks) throws KernelTypes.KernelException{
             this.viCallbacks = callbacks;
-            try (var arena = Arena.ofConfined()) {
-                MemorySegment holder = arena.allocate(VALIDATION_CALLBACK_LAYOUT);
-                holder.set(ValueLayout.ADDRESS, 0, MemorySegment.ofAddress(System.identityHashCode(callbacks)));
+            MemorySegment holder = callbackArena.allocate(VALIDATION_CALLBACK_LAYOUT);
+            holder.set(ValueLayout.ADDRESS, 0, MemorySegment.ofAddress(System.identityHashCode(callbacks)));
 
-                MemorySegment blockCheckStub = Linker.nativeLinker().upcallStub(
-                        BLOCK_CHECKED_MH.bindTo(callbacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.ADDRESS),
-                        callbackArena
-                );
-                holder.set(ValueLayout.ADDRESS, ValueLayout.ADDRESS.byteSize(), blockCheckStub);
-                kernel_context_options_set_validation_interface(inner, holder);
-            }
+            MemorySegment blockCheckStub = Linker.nativeLinker().upcallStub(
+                    BLOCK_CHECKED_MH.bindTo(callbacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.ADDRESS),
+                    callbackArena
+            );
+            holder.set(ValueLayout.ADDRESS, ValueLayout.ADDRESS.byteSize(), blockCheckStub);
+            kernel_context_options_set_validation_interface(inner, holder);
             return this;
         }
 
@@ -220,13 +215,18 @@ public class ContextManager {
                 throw new KernelTypes.KernelException("Failed to create context");
             }
             kernel_context_options_destroy(inner);
+            inner = MemorySegment.NULL;
+            built = true;
             return new Context(contextInner, knCallbacks, viCallbacks, callbackArena);
         }
 
         @Override
         public void close() {
-            kernel_context_options_destroy(inner);
-            callbackArena.close();
+            if (!built && inner != MemorySegment.NULL) {
+                kernel_context_options_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
+//            callbackArena.close();
         }
     }
 
@@ -249,7 +249,9 @@ public class ContextManager {
 
         @Override
         public void close() {
-            kernel_chain_parameters_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_context_options_destroy(inner);
+            }
         }
     }
 }

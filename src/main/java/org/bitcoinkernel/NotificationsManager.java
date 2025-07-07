@@ -3,30 +3,24 @@ package org.bitcoinkernel;
 import org.bitcoinkernel.KernelTypes;
 import org.bitcoinkernel.KernelData;
 
+import java.lang.foreign.MemorySegment;
+
 public class NotificationsManager {
     // Callbacks interfaces
     public interface KernelNotificationInterfaceCallbacks {
 
-        void blockTip(int state, KernelData.BlockIndex blockIndex, double verificationProgress);
+        void blockTip(int state, MemorySegment blockIndex, double verificationProgress);
         void headerTip(int state, long height, long timestamp, boolean presync);
-        void progress(String title, int progressPercent, boolean resumePossible);
-        void warningSet(int warning, String message);
-        void warningUnset(int warning, String message);
-        void flushError(String message);
-        void fatalError(String message);
+        void progress(MemorySegment title, int progressPercent, boolean resumePossible);
+        void warningSet(int warning, MemorySegment message);
+        void warningUnset(int warning);
+        void flushError(MemorySegment message);
+        void fatalError(MemorySegment message);
     }
 
-    public static class ValidationInterfaceCallbacks {
-        public final BlockCheckedCallback blockChecked;
+    public interface ValidationInterfaceCallbacks {
 
-        public ValidationInterfaceCallbacks(BlockCheckedCallback blockChecked) {
-            this.blockChecked = blockChecked;
-        }
-
-        @FunctionalInterface
-        public interface BlockCheckedCallback {
-            void blockChecked(KernelData.Block block, KernelTypes.BlockValidationState state);
-        }
+        void blockChecked(MemorySegment block, MemorySegment state);
 
     }
 

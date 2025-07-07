@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id "io.github.krakowski.jextract" version "0.5.0"
+    id "application"
 }
 
 repositories {
@@ -38,7 +39,6 @@ tasks.register('compileBitcoinCore', Exec) {
     inputs.dir bitcoinBuildDir
     outputs.files(
             "${bitcoinBuildDir}/src/kernel/libbitcoinkernel.so",
-            "${bitcoinBuildDir}/src/kernel/libbitcoinkernel.dylib"  // For macOS
     )
 }
 compileBitcoinCore.dependsOn(buildBitcoinCore)
@@ -48,8 +48,7 @@ jextract {
     header(bitcoinKernelHeader.absolutePath) {
         // Point to the compiled library - adjust extension based on your OS
         libraries = [
-                ":${bitcoinBuildDir}/src/kernel/libbitcoinkernel.so",
-                ":${bitcoinBuildDir}/src/kernel/libbitcoinkernel.dylib"
+                ":/usr/local/lib/libbitcoinkernel.so"
         ]
         targetPackage = 'org.bitcoinkernel'
         className = 'BitcoinKernelBindings'
@@ -72,6 +71,13 @@ sourceSets {
             srcDir "${buildDir}/generated/sources/jextract"
         }
     }
+}
+
+application {
+    mainClass = "org.bitcoinkernel.TestKernel"
+    applicationDefaultJvmArgs = [
+            "--enable-native-access=ALL-UNNAMED"
+    ]
 }
 
 // Ensure proper build order

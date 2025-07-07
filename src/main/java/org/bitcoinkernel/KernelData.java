@@ -54,7 +54,9 @@ public class KernelData {
 
         @Override
         public void close() {
-            kernel_script_pubkey_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_script_pubkey_destroy(inner);
+            }
         }
     }
 
@@ -83,7 +85,9 @@ public class KernelData {
         }
 
         public void close() {
-            kernel_transaction_output_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_transaction_output_destroy(inner);
+            }
         }
     }
 
@@ -108,7 +112,9 @@ public class KernelData {
 
         @Override
         public void close() {
-            kernel_transaction_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_transaction_destroy(inner);
+            }
         }
     }
 
@@ -201,7 +207,9 @@ public class KernelData {
 
         @Override
         public void close() {
-            kernel_block_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_block_destroy(inner);
+            }
         }
     }
 
@@ -272,7 +280,9 @@ public class KernelData {
 
         @Override
         public void close() {
-            kernel_block_index_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_block_index_destroy(inner);
+            }
         }
     }
 
@@ -300,7 +310,9 @@ public class KernelData {
 
         @Override
         public void close() {
-            kernel_block_undo_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_block_undo_destroy(inner);
+            }
         }
     }
 }

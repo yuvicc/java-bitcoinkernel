@@ -10,22 +10,22 @@ public class ChainstateManagerr {
     // Chainstate manager options
     public static class ChainstateManagerOptions implements AutoCloseable {
         private final MemorySegment inner;
+        private final Arena arena;
 
         public ChainstateManagerOptions(ContextManager.Context context, String dataDir, String blocksDir) throws KernelTypes.KernelException {
-            try (var arena = Arena.ofConfined()) {
-                MemorySegment cDataDir = arena.allocateFrom(ValueLayout.JAVA_BYTE, dataDir.getBytes(StandardCharsets.UTF_8));
-                MemorySegment cBlocksDir = arena.allocateFrom(ValueLayout.JAVA_BYTE, blocksDir.getBytes(StandardCharsets.UTF_8));
-                this.inner = kernel_chainstate_manager_options_create(
-                        context.getInner(),
-                        cDataDir,
-                        cDataDir.byteSize(),
-                        cBlocksDir,
-                        cBlocksDir.byteSize()
-                );
-                // todo: add check here for chainstate manager options create
-//                if (inner = MemorySegment.NULL) {
-//                    throw new KernelTypes.KernelException("Failed to create chainstate manager options");
-//                }
+            this.arena = Arena.ofConfined();  // not closed immediately
+
+            MemorySegment cDataDir = arena.allocateFrom(ValueLayout.JAVA_BYTE, dataDir.getBytes(StandardCharsets.UTF_8));
+            MemorySegment cBlocksDir = arena.allocateFrom(ValueLayout.JAVA_BYTE, blocksDir.getBytes(StandardCharsets.UTF_8));
+
+            this.inner = kernel_chainstate_manager_options_create(
+                    context.getInner(),
+                    cDataDir, cDataDir.byteSize(),
+                    cBlocksDir, cBlocksDir.byteSize()
+            );
+            if (inner == MemorySegment.NULL) {
+                arena.close();  // cleanup on failure
+                throw new KernelTypes.KernelException("...");
             }
         }
 
@@ -53,7 +53,9 @@ public class ChainstateManagerr {
         }
 
         public void close() {
-            kernel_chainstate_manager_options_destroy(inner);
+            if (inner != MemorySegment.NULL) {
+                kernel_chainstate_manager_options_destroy(inner);
+            }
         }
     }
 
@@ -140,7 +142,9 @@ public class ChainstateManagerr {
 
         @Override
         public void close() {
-            kernel_chainstate_manager_destroy(inner, context.getInner());
+            if (inner != MemorySegment.NULL) {
+                kernel_chainstate_manager_destroy(inner, context.getInner());
+            }
         }
     }
 }
