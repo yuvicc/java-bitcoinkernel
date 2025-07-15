@@ -110,7 +110,12 @@ public class BitcoinKernel implements AutoCloseable {
     /**
      * Verifies a transaction input against its corresponding output script
      *
-     * @param scriptPubkey ---- todo
+     * @param scriptPubkey script pubkey of the transaction
+     * @param amount amount to spend
+     * @param txTo raw transactions data
+     * @param inputIndex index of input spend
+     * @param flags verification flags
+     * @param spentOutputs spent outputs data
      */
     public static void verify(KernelData.ScriptPubkey scriptPubkey, Long amount, KernelData.Transaction txTo, int inputIndex, Integer flags, List<KernelData.TxOut> spentOutputs) throws KernelTypes.KernelException {
 

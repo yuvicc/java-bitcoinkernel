@@ -144,53 +144,51 @@ public class ContextManager {
 
         public ContextBuilder notificationCallbacks(NotificationsManager.KernelNotificationInterfaceCallbacks callBacks) {
             this.knCallbacks = callBacks;
-            try (var arena = Arena.ofConfined()) {
-                MemorySegment holder = arena.allocate(NOTIFICATION_CALLBACK_LAYOUT);
-                holder.set(ValueLayout.ADDRESS, 0, MemorySegment.ofAddress(System.identityHashCode(callBacks)));
-                MemorySegment blockTipStub = Linker.nativeLinker().upcallStub(
-                        BLOCK_TIP_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE),
-                        callbackArena
-                );
-                MemorySegment headerTipStub = Linker.nativeLinker().upcallStub(
-                        HEADER_TIP_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_BOOLEAN),
-                        callbackArena
-                );
-                MemorySegment progressStub = Linker.nativeLinker().upcallStub(
-                        PROGRESS_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN),
-                        callbackArena
-                );
-                MemorySegment warningSetStub = Linker.nativeLinker().upcallStub(
-                        WARNING_SET_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.ADDRESS),
-                        callbackArena
-                );
-                MemorySegment warningUnsetStub = Linker.nativeLinker().upcallStub(
-                        WARNING_UNSET_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT),
-                        callbackArena
-                );
-                MemorySegment flushErrorStub = Linker.nativeLinker().upcallStub(
-                        FLUSH_ERROR_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS),
-                        callbackArena
-                );
-                MemorySegment fatalErrorStub = Linker.nativeLinker().upcallStub(
-                        FATAL_ERROR_MH.bindTo(callBacks),
-                        FunctionDescriptor.ofVoid(ValueLayout.ADDRESS),
-                        callbackArena
-                );
-                holder.set(ValueLayout.ADDRESS, ValueLayout.ADDRESS.byteSize(), blockTipStub);
-                holder.set(ValueLayout.ADDRESS, 2 * ValueLayout.ADDRESS.byteSize(), headerTipStub);
-                holder.set(ValueLayout.ADDRESS, 3 * ValueLayout.ADDRESS.byteSize(), progressStub);
-                holder.set(ValueLayout.ADDRESS, 4 * ValueLayout.ADDRESS.byteSize(), warningSetStub);
-                holder.set(ValueLayout.ADDRESS, 5 * ValueLayout.ADDRESS.byteSize(), warningUnsetStub);
-                holder.set(ValueLayout.ADDRESS, 6 * ValueLayout.ADDRESS.byteSize(), flushErrorStub);
-                holder.set(ValueLayout.ADDRESS, 7 * ValueLayout.ADDRESS.byteSize(), fatalErrorStub);
-                kernel_context_options_set_notifications(inner, holder);
-            }
+            MemorySegment holder = callbackArena.allocate(NOTIFICATION_CALLBACK_LAYOUT);
+            holder.set(ValueLayout.ADDRESS, 0, MemorySegment.ofAddress(System.identityHashCode(callBacks)));
+            MemorySegment blockTipStub = Linker.nativeLinker().upcallStub(
+                    BLOCK_TIP_MH.bindTo(callBacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.JAVA_DOUBLE),
+                    callbackArena
+            );
+            MemorySegment headerTipStub = Linker.nativeLinker().upcallStub(
+                    HEADER_TIP_MH.bindTo(callBacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.JAVA_LONG, ValueLayout.JAVA_LONG, ValueLayout.JAVA_BOOLEAN),
+                    callbackArena
+            );
+            MemorySegment progressStub = Linker.nativeLinker().upcallStub(
+                    PROGRESS_MH.bindTo(callBacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS, ValueLayout.JAVA_INT, ValueLayout.JAVA_BOOLEAN),
+                    callbackArena
+            );
+            MemorySegment warningSetStub = Linker.nativeLinker().upcallStub(
+                    WARNING_SET_MH.bindTo(callBacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT, ValueLayout.ADDRESS),
+                    callbackArena
+            );
+            MemorySegment warningUnsetStub = Linker.nativeLinker().upcallStub(
+                    WARNING_UNSET_MH.bindTo(callBacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.JAVA_INT),
+                    callbackArena
+            );
+            MemorySegment flushErrorStub = Linker.nativeLinker().upcallStub(
+                    FLUSH_ERROR_MH.bindTo(callBacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS),
+                    callbackArena
+            );
+            MemorySegment fatalErrorStub = Linker.nativeLinker().upcallStub(
+                    FATAL_ERROR_MH.bindTo(callBacks),
+                    FunctionDescriptor.ofVoid(ValueLayout.ADDRESS),
+                    callbackArena
+            );
+            holder.set(ValueLayout.ADDRESS, ValueLayout.ADDRESS.byteSize(), blockTipStub);
+            holder.set(ValueLayout.ADDRESS, 2 * ValueLayout.ADDRESS.byteSize(), headerTipStub);
+            holder.set(ValueLayout.ADDRESS, 3 * ValueLayout.ADDRESS.byteSize(), progressStub);
+            holder.set(ValueLayout.ADDRESS, 4 * ValueLayout.ADDRESS.byteSize(), warningSetStub);
+            holder.set(ValueLayout.ADDRESS, 5 * ValueLayout.ADDRESS.byteSize(), warningUnsetStub);
+            holder.set(ValueLayout.ADDRESS, 6 * ValueLayout.ADDRESS.byteSize(), flushErrorStub);
+            holder.set(ValueLayout.ADDRESS, 7 * ValueLayout.ADDRESS.byteSize(), fatalErrorStub);
+            kernel_context_options_set_notifications(inner, holder);
             return this;
         }
 

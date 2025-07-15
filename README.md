@@ -41,6 +41,14 @@ Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/
 ./gradlew compileJava
 ```
 
+*Note: You might need to update the build.gradle file with different libraries extension(.so for linux, .dylib for macos, .dll for windows)*
+
+```bash
+        libraries = [
+                ":/usr/local/lib/libbitcoinkernel.so"
+        ]
+```
+
 
 ## References
 - Upstream PR of C header API library -> https://github.com/bitcoin/bitcoin/pull/30595

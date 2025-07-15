@@ -23,9 +23,9 @@ tasks.register('buildBitcoinCore', Exec) {
             '-DBUILD_UTIL_CHAINSTATE=ON'
 
     // Only run if build directory doesn't exist or header has changed
-    inputs.file bitcoinKernelHeader
-    inputs.dir "${bitcoinCoreDir}/src"
-    outputs.dir bitcoinBuildDir
+//    inputs.file bitcoinKernelHeader
+//    inputs.dir "${bitcoinCoreDir}/src"
+//    outputs.dir bitcoinBuildDir
 }
 
 // Task to compile the built Bitcoin Core
@@ -36,10 +36,10 @@ tasks.register('compileBitcoinCore', Exec) {
     // todo: add more robust approach here for compiling parallelly, for now I have kept it low(we can use nproc here but it crashes my machine)
     commandLine 'cmake', '--build', 'build', '-j4'
 
-    inputs.dir bitcoinBuildDir
-    outputs.files(
-            "${bitcoinBuildDir}/src/kernel/libbitcoinkernel.so",
-    )
+//    inputs.dir bitcoinBuildDir
+//    outputs.files(
+//            "${bitcoinBuildDir}/src/kernel/libbitcoinkernel.so",
+//    )
 }
 compileBitcoinCore.dependsOn(buildBitcoinCore)
 
@@ -48,7 +48,7 @@ jextract {
     header(bitcoinKernelHeader.absolutePath) {
         // Point to the compiled library - adjust extension based on your OS
         libraries = [
-                ":/usr/local/lib/libbitcoinkernel.so"
+                ":${bitcoinBuildDir}/lib/libbitcoinkernel.so"       // change this with respect to your operating system(see readme)
         ]
         targetPackage = 'org.bitcoinkernel'
         className = 'BitcoinKernelBindings'
