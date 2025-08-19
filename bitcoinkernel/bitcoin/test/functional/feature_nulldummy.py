@@ -45,7 +45,6 @@ def invalidate_nulldummy_tx(tx):
     to be non-NULLDUMMY compliant by replacing the dummy with OP_TRUE"""
     assert_equal(tx.vin[0].scriptSig[0], OP_0)
     tx.vin[0].scriptSig = bytes([OP_TRUE]) + tx.vin[0].scriptSig[1:]
-    tx.rehash()
 
 
 class NULLDUMMYTest(BitcoinTestFramework):
@@ -111,7 +110,7 @@ class NULLDUMMYTest(BitcoinTestFramework):
         self.block_submit(self.nodes[0], [test2tx], accept=True)
 
         self.log.info("Test 4: Non-NULLDUMMY base multisig transaction is invalid after activation")
-        test4tx = self.create_transaction(txid=test2tx.hash, input_details=ms_unlock_details,
+        test4tx = self.create_transaction(txid=test2tx.txid_hex, input_details=ms_unlock_details,
                                           addr=getnewdestination()[2], amount=46,
                                           privkey=self.privkey)
         test6txs = [CTransaction(test4tx)]
@@ -144,8 +143,8 @@ class NULLDUMMYTest(BitcoinTestFramework):
         block.solve()
         assert_equal(None if accept else NULLDUMMY_ERROR, node.submitblock(block.serialize().hex()))
         if accept:
-            assert_equal(node.getbestblockhash(), block.hash)
-            self.lastblockhash = block.hash
+            assert_equal(node.getbestblockhash(), block.hash_hex)
+            self.lastblockhash = block.hash_hex
             self.lastblocktime += 1
             self.lastblockheight += 1
         else:

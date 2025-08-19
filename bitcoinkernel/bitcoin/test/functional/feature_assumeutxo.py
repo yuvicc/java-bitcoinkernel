@@ -272,7 +272,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         block_time = node0.getblock(node0.getbestblockhash())['time'] + 1
         fork_block1 = create_block(int(parent_block_hash, 16), create_coinbase(SNAPSHOT_BASE_HEIGHT), block_time)
         fork_block1.solve()
-        fork_block2 = create_block(fork_block1.sha256, create_coinbase(SNAPSHOT_BASE_HEIGHT + 1), block_time + 1)
+        fork_block2 = create_block(fork_block1.hash_int, create_coinbase(SNAPSHOT_BASE_HEIGHT + 1), block_time + 1)
         fork_block2.solve()
         node1.submitheader(fork_block1.serialize().hex())
         node1.submitheader(fork_block2.serialize().hex())
@@ -481,14 +481,8 @@ class AssumeutxoTest(BitcoinTestFramework):
 
         # Use a hash instead of a height
         prev_snap_hash = n0.getblockhash(prev_snap_height)
-        dump_output5 = n0.dumptxoutset('utxos5.dat', rollback=prev_snap_hash)
+        dump_output5 = n0.dumptxoutset('utxos5.dat', rollback=self.convert_to_json_for_cli(prev_snap_hash))
         assert_equal(sha256sum_file(dump_output4['path']), sha256sum_file(dump_output5['path']))
-
-        # TODO: This is a hack to set m_best_header to the correct value after
-        # dumptxoutset/reconsiderblock. Otherwise the wrong error messages are
-        # returned in following tests. It can be removed once this bug is
-        # fixed. See also https://github.com/bitcoin/bitcoin/issues/26245
-        self.restart_node(0, ["-reindex"])
 
         # Ensure n0 is back at the tip
         assert_equal(n0.getblockchaininfo()["blocks"], FINAL_HEIGHT)
@@ -605,7 +599,7 @@ class AssumeutxoTest(BitcoinTestFramework):
         privkey = n0.get_deterministic_priv_key().key
         raw_tx = n1.createrawtransaction([prevout], {getnewdestination()[2]: 24.99})
         signed_tx = n1.signrawtransactionwithkey(raw_tx, [privkey], [prevout])['hex']
-        signed_txid = tx_from_hex(signed_tx).rehash()
+        signed_txid = tx_from_hex(signed_tx).txid_hex
 
         assert n1.gettxout(prev_tx['txid'], 0) is not None
         n1.sendrawtransaction(signed_tx)

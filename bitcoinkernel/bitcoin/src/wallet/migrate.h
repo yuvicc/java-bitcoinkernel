@@ -35,9 +35,9 @@ public:
     /** Open the database if it is not already opened. */
     void Open() override;
 
-    /** Rewrite the entire database on disk, with the exception of key pszSkip if non-zero
+    /** Rewrite the entire database on disk
      */
-    bool Rewrite(const char* pszSkip = nullptr) override { return false; }
+    bool Rewrite() override { return false; }
 
     /** Back up the entire database to a file.
      */
@@ -50,6 +50,7 @@ public:
 
     /** Return path to main database file for logs and error messages. */
     std::string Filename() override { return fs::PathToString(m_filepath); }
+    std::vector<fs::path> Files() override { return {m_filepath}; }
 
     std::string Format() override { return "bdb_ro"; }
 

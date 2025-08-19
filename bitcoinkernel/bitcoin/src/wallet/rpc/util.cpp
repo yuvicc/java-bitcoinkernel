@@ -29,19 +29,25 @@ bool GetAvoidReuseFlag(const CWallet& wallet, const UniValue& param) {
     return avoid_reuse;
 }
 
-/** Used by RPC commands that have an include_watchonly parameter.
- *  We default to true for watchonly wallets if include_watchonly isn't
- *  explicitly set.
- */
-bool ParseIncludeWatchonly(const UniValue& include_watchonly, const CWallet& wallet)
+std::string EnsureUniqueWalletName(const JSONRPCRequest& request, const std::string* wallet_name)
 {
-    if (include_watchonly.isNull()) {
-        // if include_watchonly isn't explicitly set, then check if we have a watchonly wallet
-        return wallet.IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS);
+    std::string endpoint_wallet;
+    if (GetWalletNameFromJSONRPCRequest(request, endpoint_wallet)) {
+        // wallet endpoint was used
+        if (wallet_name && *wallet_name != endpoint_wallet) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER,
+                "The RPC endpoint wallet and the wallet name parameter specify different wallets");
+        }
+        return endpoint_wallet;
     }
 
-    // otherwise return whatever include_watchonly was set to
-    return include_watchonly.get_bool();
+    // Not a wallet endpoint; parameter must be provided
+    if (!wallet_name) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+            "Either the RPC endpoint wallet or the wallet name parameter must be provided");
+    }
+
+    return *wallet_name;
 }
 
 bool GetWalletNameFromJSONRPCRequest(const JSONRPCRequest& request, std::string& wallet_name)
@@ -109,7 +115,10 @@ void PushParentDescriptors(const CWallet& wallet, const CScript& script_pubkey, 
 {
     UniValue parent_descs(UniValue::VARR);
     for (const auto& desc: wallet.GetWalletDescriptors(script_pubkey)) {
-        parent_descs.push_back(desc.descriptor->ToString());
+        std::string desc_str;
+        FlatSigningProvider dummy_provider;
+        if (!CHECK_NONFATAL(desc.descriptor->ToNormalizedString(dummy_provider, desc_str, &desc.cache))) continue;
+        parent_descs.push_back(desc_str);
     }
     entry.pushKV("parent_descs", std::move(parent_descs));
 }

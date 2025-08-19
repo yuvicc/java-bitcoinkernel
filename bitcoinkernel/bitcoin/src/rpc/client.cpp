@@ -1,5 +1,5 @@
 // Copyright (c) 2010 Satoshi Nakamoto
-// Copyright (c) 2009-2022 The Bitcoin Core developers
+// Copyright (c) 2009-present The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,8 +7,8 @@
 #include <rpc/client.h>
 #include <tinyformat.h>
 
+#include <cstdint>
 #include <set>
-#include <stdint.h>
 #include <string>
 #include <string_view>
 
@@ -275,7 +275,6 @@ static const CRPCConvertParam vRPCConvertParams[] =
     { "logging", 0, "include" },
     { "logging", 1, "exclude" },
     { "disconnectnode", 1, "nodeid" },
-    { "upgradewallet", 0, "version" },
     { "gethdkeys", 0, "active_only" },
     { "gethdkeys", 0, "options" },
     { "gethdkeys", 0, "private" },
