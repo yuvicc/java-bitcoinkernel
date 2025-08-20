@@ -112,20 +112,11 @@ public:
      */
     virtual std::vector<WalletDestination> MarkUnusedAddresses(const CScript& script) { return {}; }
 
-    /** Sets up the key generation stuff, i.e. generates new HD seeds and sets them as active.
-      * Returns false if already setup or setup fails, true if setup is successful
-      * Set force=true to make it re-setup if already setup, used for upgrades
-      */
-    virtual bool SetupGeneration(bool force = false) { return false; }
-
     /* Returns true if HD is enabled */
     virtual bool IsHDEnabled() const { return false; }
 
     /* Returns true if the wallet can give out new addresses. This means it has keys in the keypool or can generate new keys */
     virtual bool CanGetAddresses(bool internal = false) const { return false; }
-
-    /** Upgrades the wallet to the specified version */
-    virtual bool Upgrade(int prev_version, int new_version, bilingual_str& error) { return true; }
 
     virtual bool HavePrivateKeys() const { return false; }
     virtual bool HaveCryptedKeys() const { return false; }

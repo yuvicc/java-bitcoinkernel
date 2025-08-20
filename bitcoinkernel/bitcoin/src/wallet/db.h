@@ -139,9 +139,9 @@ public:
     //! Counts the number of active database users to be sure that the database is not closed while someone is using it
     std::atomic<int> m_refcount{0};
 
-    /** Rewrite the entire database on disk, with the exception of key pszSkip if non-zero
+    /** Rewrite the entire database on disk
      */
-    virtual bool Rewrite(const char* pszSkip=nullptr) = 0;
+    virtual bool Rewrite() = 0;
 
     /** Back up the entire database to a file.
      */
@@ -154,6 +154,9 @@ public:
 
     /** Return path to main database file for logs and error messages. */
     virtual std::string Filename() = 0;
+
+    /** Return paths to all database created files */
+    virtual std::vector<fs::path> Files() = 0;
 
     virtual std::string Format() = 0;
 

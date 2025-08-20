@@ -249,14 +249,12 @@ public:
     bool lockCoin(const COutPoint& output, const bool write_to_db) override
     {
         LOCK(m_wallet->cs_wallet);
-        std::unique_ptr<WalletBatch> batch = write_to_db ? std::make_unique<WalletBatch>(m_wallet->GetDatabase()) : nullptr;
-        return m_wallet->LockCoin(output, batch.get());
+        return m_wallet->LockCoin(output, write_to_db);
     }
     bool unlockCoin(const COutPoint& output) override
     {
         LOCK(m_wallet->cs_wallet);
-        std::unique_ptr<WalletBatch> batch = std::make_unique<WalletBatch>(m_wallet->GetDatabase());
-        return m_wallet->UnlockCoin(output, batch.get());
+        return m_wallet->UnlockCoin(output);
     }
     bool isLockedCoin(const COutPoint& output) override
     {
@@ -643,6 +641,10 @@ public:
         DatabaseStatus status;
         bilingual_str error;
         auto db = MakeWalletDatabase(wallet_name, options, status, error);
+        if (!db && status == wallet::DatabaseStatus::FAILED_LEGACY_DISABLED) {
+            options.require_format = wallet::DatabaseFormat::BERKELEY_RO;
+            db = MakeWalletDatabase(wallet_name, options, status, error);
+        }
         if (!db) return false;
         return WalletBatch(*db).IsEncrypted();
     }

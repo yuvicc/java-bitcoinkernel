@@ -171,7 +171,7 @@ RPCHelpMan getbalance()
                 {
                     {"dummy", RPCArg::Type::STR, RPCArg::Optional::OMITTED, "Remains for backward compatibility. Must be excluded or set to \"*\"."},
                     {"minconf", RPCArg::Type::NUM, RPCArg::Default{0}, "Only include transactions confirmed at least this many times."},
-                    {"include_watchonly", RPCArg::Type::BOOL, RPCArg::DefaultHint{"true for watch-only wallets, otherwise false"}, "Also include balance in watch-only addresses (see 'importaddress')"},
+                    {"include_watchonly", RPCArg::Type::BOOL, RPCArg::Default{false}, "No longer used"},
                     {"avoid_reuse", RPCArg::Type::BOOL, RPCArg::Default{true}, "(only available if avoid_reuse wallet flag is set) Do not include balance in dirty outputs; addresses are considered dirty if they have previously been used in a transaction."},
                 },
                 RPCResult{
@@ -203,36 +203,11 @@ RPCHelpMan getbalance()
 
     const auto min_depth{self.Arg<int>("minconf")};
 
-    bool include_watchonly = ParseIncludeWatchonly(request.params[2], *pwallet);
-
     bool avoid_reuse = GetAvoidReuseFlag(*pwallet, request.params[3]);
 
     const auto bal = GetBalance(*pwallet, min_depth, avoid_reuse);
 
-    return ValueFromAmount(bal.m_mine_trusted + (include_watchonly ? bal.m_watchonly_trusted : 0));
-},
-    };
-}
-
-RPCHelpMan getunconfirmedbalance()
-{
-    return RPCHelpMan{"getunconfirmedbalance",
-                "DEPRECATED\nIdentical to getbalances().mine.untrusted_pending\n",
-                {},
-                RPCResult{RPCResult::Type::NUM, "", "The balance"},
-                RPCExamples{""},
-        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
-{
-    const std::shared_ptr<const CWallet> pwallet = GetWalletForJSONRPCRequest(request);
-    if (!pwallet) return UniValue::VNULL;
-
-    // Make sure the results are valid at least up to the most recent block
-    // the user could have gotten from another RPC command prior to now
-    pwallet->BlockUntilSyncedToCurrentChain();
-
-    LOCK(pwallet->cs_wallet);
-
-    return ValueFromAmount(GetBalance(*pwallet).m_mine_untrusted_pending);
+    return ValueFromAmount(bal.m_mine_trusted);
 },
     };
 }
@@ -356,16 +331,12 @@ RPCHelpMan lockunspent()
         outputs.push_back(outpt);
     }
 
-    std::unique_ptr<WalletBatch> batch = nullptr;
-    // Unlock is always persistent
-    if (fUnlock || persistent) batch = std::make_unique<WalletBatch>(pwallet->GetDatabase());
-
     // Atomically set (un)locked status for the outputs.
     for (const COutPoint& outpt : outputs) {
         if (fUnlock) {
-            if (!pwallet->UnlockCoin(outpt, batch.get())) throw JSONRPCError(RPC_WALLET_ERROR, "Unlocking coin failed");
+            if (!pwallet->UnlockCoin(outpt)) throw JSONRPCError(RPC_WALLET_ERROR, "Unlocking coin failed");
         } else {
-            if (!pwallet->LockCoin(outpt, batch.get())) throw JSONRPCError(RPC_WALLET_ERROR, "Locking coin failed");
+            if (!pwallet->LockCoin(outpt, persistent)) throw JSONRPCError(RPC_WALLET_ERROR, "Locking coin failed");
         }
     }
 

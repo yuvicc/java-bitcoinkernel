@@ -42,9 +42,6 @@ static RPCHelpMan getwalletinfo()
                         {RPCResult::Type::STR, "walletname", "the wallet name"},
                         {RPCResult::Type::NUM, "walletversion", "the wallet version"},
                         {RPCResult::Type::STR, "format", "the database format (only sqlite)"},
-                        {RPCResult::Type::STR_AMOUNT, "balance", "DEPRECATED. Identical to getbalances().mine.trusted"},
-                        {RPCResult::Type::STR_AMOUNT, "unconfirmed_balance", "DEPRECATED. Identical to getbalances().mine.untrusted_pending"},
-                        {RPCResult::Type::STR_AMOUNT, "immature_balance", "DEPRECATED. Identical to getbalances().mine.immature"},
                         {RPCResult::Type::NUM, "txcount", "the total number of transactions in the wallet"},
                         {RPCResult::Type::NUM, "keypoolsize", "how many new keys are pre-generated (only counts external keys)"},
                         {RPCResult::Type::NUM, "keypoolsize_hd_internal", /*optional=*/true, "how many new keys are pre-generated for internal use (used for change outputs, only appears if the wallet is using this feature, otherwise external keys are used)"},
@@ -61,6 +58,10 @@ static RPCHelpMan getwalletinfo()
                         {RPCResult::Type::BOOL, "external_signer", "whether this wallet is configured to use an external signer such as a hardware wallet"},
                         {RPCResult::Type::BOOL, "blank", "Whether this wallet intentionally does not contain any keys, scripts, or descriptors"},
                         {RPCResult::Type::NUM_TIME, "birthtime", /*optional=*/true, "The start time for blocks scanning. It could be modified by (re)importing any descriptor with an earlier timestamp."},
+                        {RPCResult::Type::ARR, "flags", "The flags currently set on the wallet",
+                        {
+                            {RPCResult::Type::STR, "flag", "The name of the flag"},
+                        }},
                         RESULT_LAST_PROCESSED_BLOCK,
                     }},
                 },
@@ -82,13 +83,9 @@ static RPCHelpMan getwalletinfo()
     UniValue obj(UniValue::VOBJ);
 
     size_t kpExternalSize = pwallet->KeypoolCountExternalKeys();
-    const auto bal = GetBalance(*pwallet);
     obj.pushKV("walletname", pwallet->GetName());
     obj.pushKV("walletversion", pwallet->GetVersion());
     obj.pushKV("format", pwallet->GetDatabase().Format());
-    obj.pushKV("balance", ValueFromAmount(bal.m_mine_trusted));
-    obj.pushKV("unconfirmed_balance", ValueFromAmount(bal.m_mine_untrusted_pending));
-    obj.pushKV("immature_balance", ValueFromAmount(bal.m_mine_immature));
     obj.pushKV("txcount",       (int)pwallet->mapWallet.size());
     obj.pushKV("keypoolsize", (int64_t)kpExternalSize);
 
@@ -115,6 +112,21 @@ static RPCHelpMan getwalletinfo()
     if (int64_t birthtime = pwallet->GetBirthTime(); birthtime != UNKNOWN_TIME) {
         obj.pushKV("birthtime", birthtime);
     }
+
+    // Push known flags
+    UniValue flags(UniValue::VARR);
+    uint64_t wallet_flags = pwallet->GetWalletFlags();
+    for (uint64_t i = 0; i < 64; ++i) {
+        uint64_t flag = uint64_t{1} << i;
+        if (flag & wallet_flags) {
+            if (flag & KNOWN_WALLET_FLAGS) {
+                flags.push_back(WALLET_FLAG_TO_STRING.at(WalletFlags{flag}));
+            } else {
+                flags.push_back(strprintf("unknown_flag_%u", i));
+            }
+        }
+    }
+    obj.pushKV("flags", flags);
 
     AppendLastProcessedBlock(obj, *pwallet);
     return obj;
@@ -267,7 +279,7 @@ static RPCHelpMan loadwallet()
 static RPCHelpMan setwalletflag()
 {
             std::string flags;
-            for (auto& it : WALLET_FLAG_MAP)
+            for (auto& it : STRING_TO_WALLET_FLAG)
                 if (it.second & MUTABLE_WALLET_FLAGS)
                     flags += (flags == "" ? "" : ", ") + it.first;
 
@@ -298,11 +310,11 @@ static RPCHelpMan setwalletflag()
     std::string flag_str = request.params[0].get_str();
     bool value = request.params[1].isNull() || request.params[1].get_bool();
 
-    if (!WALLET_FLAG_MAP.count(flag_str)) {
+    if (!STRING_TO_WALLET_FLAG.count(flag_str)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Unknown wallet flag: %s", flag_str));
     }
 
-    auto flag = WALLET_FLAG_MAP.at(flag_str);
+    auto flag = STRING_TO_WALLET_FLAG.at(flag_str);
 
     if (!(flag & MUTABLE_WALLET_FLAGS)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Wallet flag is immutable: %s", flag_str));
@@ -426,8 +438,8 @@ static RPCHelpMan createwallet()
 static RPCHelpMan unloadwallet()
 {
     return RPCHelpMan{"unloadwallet",
-                "Unloads the wallet referenced by the request endpoint, otherwise unloads the wallet specified in the argument.\n"
-                "Specifying the wallet name on a wallet endpoint is invalid.",
+                "Unloads the wallet referenced by the request endpoint or the wallet_name argument.\n"
+                "If both are specified, they must be identical.",
                 {
                     {"wallet_name", RPCArg::Type::STR, RPCArg::DefaultHint{"the wallet name from the RPC endpoint"}, "The name of the wallet to unload. If provided both here and in the RPC endpoint, the two must be identical."},
                     {"load_on_startup", RPCArg::Type::BOOL, RPCArg::Optional::OMITTED, "Save wallet name to persistent settings and load on startup. True to add wallet to startup list, false to remove, null to leave unchanged."},
@@ -444,14 +456,7 @@ static RPCHelpMan unloadwallet()
                 },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
 {
-    std::string wallet_name;
-    if (GetWalletNameFromJSONRPCRequest(request, wallet_name)) {
-        if (!(request.params[0].isNull() || request.params[0].get_str() == wallet_name)) {
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "RPC endpoint wallet and wallet_name parameter specify different wallets");
-        }
-    } else {
-        wallet_name = request.params[0].get_str();
-    }
+    const std::string wallet_name{EnsureUniqueWalletName(request, self.MaybeArg<std::string>("wallet_name"))};
 
     WalletContext& context = EnsureWalletContext(request.context);
     std::shared_ptr<CWallet> wallet = GetWallet(context, wallet_name);
@@ -485,69 +490,6 @@ static RPCHelpMan unloadwallet()
     };
 }
 
-static RPCHelpMan upgradewallet()
-{
-    return RPCHelpMan{
-        "upgradewallet",
-        "Upgrade the wallet. Upgrades to the latest version if no version number is specified.\n"
-        "New keys may be generated and a new wallet backup will need to be made.",
-        {
-            {"version", RPCArg::Type::NUM, RPCArg::Default{int{FEATURE_LATEST}}, "The version number to upgrade to. Default is the latest wallet version."}
-        },
-        RPCResult{
-            RPCResult::Type::OBJ, "", "",
-            {
-                {RPCResult::Type::STR, "wallet_name", "Name of wallet this operation was performed on"},
-                {RPCResult::Type::NUM, "previous_version", "Version of wallet before this operation"},
-                {RPCResult::Type::NUM, "current_version", "Version of wallet after this operation"},
-                {RPCResult::Type::STR, "result", /*optional=*/true, "Description of result, if no error"},
-                {RPCResult::Type::STR, "error", /*optional=*/true, "Error message (if there is one)"}
-            },
-        },
-        RPCExamples{
-            HelpExampleCli("upgradewallet", "169900")
-            + HelpExampleRpc("upgradewallet", "169900")
-        },
-        [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
-{
-    std::shared_ptr<CWallet> const pwallet = GetWalletForJSONRPCRequest(request);
-    if (!pwallet) return UniValue::VNULL;
-
-    EnsureWalletIsUnlocked(*pwallet);
-
-    int version = 0;
-    if (!request.params[0].isNull()) {
-        version = request.params[0].getInt<int>();
-    }
-    bilingual_str error;
-    const int previous_version{pwallet->GetVersion()};
-    const bool wallet_upgraded{pwallet->UpgradeWallet(version, error)};
-    const int current_version{pwallet->GetVersion()};
-    std::string result;
-
-    if (wallet_upgraded) {
-        if (previous_version == current_version) {
-            result = "Already at latest version. Wallet version unchanged.";
-        } else {
-            result = strprintf("Wallet upgraded successfully from version %i to version %i.", previous_version, current_version);
-        }
-    }
-
-    UniValue obj(UniValue::VOBJ);
-    obj.pushKV("wallet_name", pwallet->GetName());
-    obj.pushKV("previous_version", previous_version);
-    obj.pushKV("current_version", current_version);
-    if (!result.empty()) {
-        obj.pushKV("result", result);
-    } else {
-        CHECK_NONFATAL(!error.empty());
-        obj.pushKV("error", error.original);
-    }
-    return obj;
-},
-    };
-}
-
 RPCHelpMan simulaterawtransaction()
 {
     return RPCHelpMan{
@@ -561,7 +503,7 @@ RPCHelpMan simulaterawtransaction()
             },
             {"options", RPCArg::Type::OBJ_NAMED_PARAMS, RPCArg::Optional::OMITTED, "",
                 {
-                    {"include_watchonly", RPCArg::Type::BOOL, RPCArg::DefaultHint{"true for watch-only wallets, otherwise false"}, "Whether to include watch-only addresses (see RPC importaddress)"},
+                    {"include_watchonly", RPCArg::Type::BOOL, RPCArg::Default{false}, "(DEPRECATED) No longer used"},
                 },
             },
         },
@@ -583,22 +525,7 @@ RPCHelpMan simulaterawtransaction()
 
     LOCK(wallet.cs_wallet);
 
-    UniValue include_watchonly(UniValue::VNULL);
-    if (request.params[1].isObject()) {
-        UniValue options = request.params[1];
-        RPCTypeCheckObj(options,
-            {
-                {"include_watchonly", UniValueType(UniValue::VBOOL)},
-            },
-            true, true);
-
-        include_watchonly = options["include_watchonly"];
-    }
-
     isminefilter filter = ISMINE_SPENDABLE;
-    if (ParseIncludeWatchonly(include_watchonly, wallet)) {
-        filter |= ISMINE_WATCH_ONLY;
-    }
 
     const auto& txs = request.params[0].get_array();
     CAmount changes{0};
@@ -688,17 +615,7 @@ static RPCHelpMan migratewallet()
         },
         [&](const RPCHelpMan& self, const JSONRPCRequest& request) -> UniValue
         {
-            std::string wallet_name;
-            if (GetWalletNameFromJSONRPCRequest(request, wallet_name)) {
-                if (!(request.params[0].isNull() || request.params[0].get_str() == wallet_name)) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "RPC endpoint wallet and wallet_name parameter specify different wallets");
-                }
-            } else {
-                if (request.params[0].isNull()) {
-                    throw JSONRPCError(RPC_INVALID_PARAMETER, "Either RPC endpoint wallet or wallet_name parameter must be provided");
-                }
-                wallet_name = request.params[0].get_str();
-            }
+            const std::string wallet_name{EnsureUniqueWalletName(request, self.MaybeArg<std::string>("wallet_name"))};
 
             SecureString wallet_pass;
             wallet_pass.reserve(100);
@@ -762,10 +679,6 @@ RPCHelpMan gethdkeys()
         {
             const std::shared_ptr<const CWallet> wallet = GetWalletForJSONRPCRequest(request);
             if (!wallet) return UniValue::VNULL;
-
-            if (!wallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) {
-                throw JSONRPCError(RPC_WALLET_ERROR, "gethdkeys is not available for non-descriptor wallets");
-            }
 
             LOCK(wallet->cs_wallet);
 
@@ -842,7 +755,7 @@ static RPCHelpMan createwalletdescriptor()
         "The address type must be one that the wallet does not already have a descriptor for."
         + HELP_REQUIRING_PASSPHRASE,
         {
-            {"type", RPCArg::Type::STR, RPCArg::Optional::NO, "The address type the descriptor will produce. Options are \"legacy\", \"p2sh-segwit\", \"bech32\", and \"bech32m\"."},
+            {"type", RPCArg::Type::STR, RPCArg::Optional::NO, "The address type the descriptor will produce. Options are " + FormatAllOutputTypes() + "."},
             {"options", RPCArg::Type::OBJ_NAMED_PARAMS, RPCArg::Optional::OMITTED, "", {
                 {"internal", RPCArg::Type::BOOL, RPCArg::DefaultHint{"Both external and internal will be generated unless this parameter is specified"}, "Whether to only make one descriptor that is internal (if parameter is true) or external (if parameter is false)"},
                 {"hdkey", RPCArg::Type::STR, RPCArg::DefaultHint{"The HD key used by all other active descriptors"}, "The HD key that the wallet knows the private key of, listed using 'gethdkeys', to use for this descriptor's key"},
@@ -864,11 +777,6 @@ static RPCHelpMan createwalletdescriptor()
         {
             std::shared_ptr<CWallet> const pwallet = GetWalletForJSONRPCRequest(request);
             if (!pwallet) return UniValue::VNULL;
-
-            //  Make sure wallet is a descriptor wallet
-            if (!pwallet->IsWalletFlagSet(WALLET_FLAG_DESCRIPTORS)) {
-                throw JSONRPCError(RPC_WALLET_ERROR, "createwalletdescriptor is not available for non-descriptor wallets");
-            }
 
             std::optional<OutputType> output_type = ParseOutputType(request.params[0].get_str());
             if (!output_type) {
@@ -963,7 +871,6 @@ RPCHelpMan restorewallet();
 RPCHelpMan getreceivedbyaddress();
 RPCHelpMan getreceivedbylabel();
 RPCHelpMan getbalance();
-RPCHelpMan getunconfirmedbalance();
 RPCHelpMan lockunspent();
 RPCHelpMan listlockunspent();
 RPCHelpMan getbalances();
@@ -1023,7 +930,6 @@ std::span<const CRPCCommand> GetWalletRPCCommands()
         {"wallet", &getreceivedbyaddress},
         {"wallet", &getreceivedbylabel},
         {"wallet", &gettransaction},
-        {"wallet", &getunconfirmedbalance},
         {"wallet", &getbalances},
         {"wallet", &getwalletinfo},
         {"wallet", &importdescriptors},
@@ -1056,7 +962,6 @@ std::span<const CRPCCommand> GetWalletRPCCommands()
         {"wallet", &simulaterawtransaction},
         {"wallet", &sendall},
         {"wallet", &unloadwallet},
-        {"wallet", &upgradewallet},
         {"wallet", &walletcreatefundedpsbt},
 #ifdef ENABLE_EXTERNAL_SIGNER
         {"wallet", &walletdisplayaddress},

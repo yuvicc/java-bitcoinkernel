@@ -103,7 +103,7 @@ class AssumeValidTest(BitcoinTestFramework):
         block.solve()
         # Save the coinbase for later
         self.block1 = block
-        self.tip = block.sha256
+        self.tip = block.hash_int
         height += 1
 
         # Bury the block 100 deep so the coinbase output is spendable
@@ -111,21 +111,20 @@ class AssumeValidTest(BitcoinTestFramework):
             block = create_block(self.tip, create_coinbase(height), self.block_time)
             block.solve()
             self.blocks.append(block)
-            self.tip = block.sha256
+            self.tip = block.hash_int
             self.block_time += 1
             height += 1
 
         # Create a transaction spending the coinbase output with an invalid (null) signature
         tx = CTransaction()
-        tx.vin.append(CTxIn(COutPoint(self.block1.vtx[0].sha256, 0), scriptSig=b""))
+        tx.vin.append(CTxIn(COutPoint(self.block1.vtx[0].txid_int, 0), scriptSig=b""))
         tx.vout.append(CTxOut(49 * 100000000, CScript([OP_TRUE])))
-        tx.calc_sha256()
 
         block102 = create_block(self.tip, create_coinbase(height), self.block_time, txlist=[tx])
         self.block_time += 1
         block102.solve()
         self.blocks.append(block102)
-        self.tip = block102.sha256
+        self.tip = block102.hash_int
         self.block_time += 1
         height += 1
 
@@ -134,13 +133,13 @@ class AssumeValidTest(BitcoinTestFramework):
             block = create_block(self.tip, create_coinbase(height), self.block_time)
             block.solve()
             self.blocks.append(block)
-            self.tip = block.sha256
+            self.tip = block.hash_int
             self.block_time += 1
             height += 1
 
         # Start node1 and node2 with assumevalid so they accept a block with a bad signature.
-        self.start_node(1, extra_args=["-assumevalid=" + block102.hash])
-        self.start_node(2, extra_args=["-assumevalid=" + block102.hash])
+        self.start_node(1, extra_args=["-assumevalid=" + block102.hash_hex])
+        self.start_node(2, extra_args=["-assumevalid=" + block102.hash_hex])
 
         p2p0 = self.nodes[0].add_p2p_connection(BaseNode())
         p2p0.send_header_for_blocks(self.blocks[0:2000])

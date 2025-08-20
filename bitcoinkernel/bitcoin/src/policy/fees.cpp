@@ -19,6 +19,7 @@
 #include <uint256.h>
 #include <util/fs.h>
 #include <util/serfloat.h>
+#include <util/syserror.h>
 #include <util/time.h>
 
 #include <algorithm>
@@ -560,7 +561,7 @@ CBlockPolicyEstimator::CBlockPolicyEstimator(const fs::path& estimation_filepath
     AutoFile est_file{fsbridge::fopen(m_estimation_filepath, "rb")};
 
     if (est_file.IsNull()) {
-        LogPrintf("%s is not found. Continue anyway.\n", fs::PathToString(m_estimation_filepath));
+        LogInfo("%s is not found. Continue anyway.", fs::PathToString(m_estimation_filepath));
         return;
     }
 
@@ -963,9 +964,14 @@ void CBlockPolicyEstimator::FlushFeeEstimates()
     AutoFile est_file{fsbridge::fopen(m_estimation_filepath, "wb")};
     if (est_file.IsNull() || !Write(est_file)) {
         LogPrintf("Failed to write fee estimates to %s. Continue anyway.\n", fs::PathToString(m_estimation_filepath));
-    } else {
-        LogPrintf("Flushed fee estimates to %s.\n", fs::PathToString(m_estimation_filepath.filename()));
+        (void)est_file.fclose();
+        return;
     }
+    if (est_file.fclose() != 0) {
+        LogError("Failed to close fee estimates file %s: %s. Continuing anyway.", fs::PathToString(m_estimation_filepath), SysErrorString(errno));
+        return;
+    }
+    LogInfo("Flushed fee estimates to %s.", fs::PathToString(m_estimation_filepath.filename()));
 }
 
 bool CBlockPolicyEstimator::Write(AutoFile& fileout) const

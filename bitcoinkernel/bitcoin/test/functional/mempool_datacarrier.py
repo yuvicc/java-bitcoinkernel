@@ -13,7 +13,10 @@ from test_framework.script import (
 )
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.test_node import TestNode
-from test_framework.util import assert_raises_rpc_error
+from test_framework.util import (
+    assert_equal,
+    assert_raises_rpc_error,
+)
 from test_framework.wallet import MiniWallet
 
 from random import randbytes
@@ -41,12 +44,20 @@ class DataCarrierTest(BitcoinTestFramework):
 
         if success:
             self.wallet.sendrawtransaction(from_node=node, tx_hex=tx_hex)
-            assert tx.rehash() in node.getrawmempool(True), f'{tx_hex} not in mempool'
+            assert tx.txid_hex in node.getrawmempool(True), f'{tx_hex} not in mempool'
         else:
             assert_raises_rpc_error(-26, "datacarrier", self.wallet.sendrawtransaction, from_node=node, tx_hex=tx_hex)
 
     def run_test(self):
         self.wallet = MiniWallet(self.nodes[0])
+
+        # Test that bare multisig is allowed by default. Do it here rather than create a new test for it.
+        assert_equal(self.nodes[0].getmempoolinfo()["permitbaremultisig"], True)
+
+        assert_equal(self.nodes[0].getmempoolinfo()["maxdatacarriersize"], MAX_OP_RETURN_RELAY)
+        assert_equal(self.nodes[1].getmempoolinfo()["maxdatacarriersize"], 0)
+        assert_equal(self.nodes[2].getmempoolinfo()["maxdatacarriersize"], CUSTOM_DATACARRIER_ARG)
+        assert_equal(self.nodes[3].getmempoolinfo()["maxdatacarriersize"], 2)
 
         # By default, any size is allowed.
 
