@@ -32,7 +32,6 @@ git subtree pull \
 - C++17 compiler (e.g. GCC/Clang)
 - Boost
 - JDK 21+ with FFM support
-- Rust (optional, if fuzzing enabled)
 
 Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md) for dependency specifics.
 
