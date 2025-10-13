@@ -81,7 +81,7 @@ public class KernelTypes {
                     return value;
                 }
             }
-            throw new IllegalArgumentException("Unknown Chain Type: " + chainType);
+            throw new IllegalArgumentException("Unknown Chainstate Type: " + chainType);
         }
     }
 

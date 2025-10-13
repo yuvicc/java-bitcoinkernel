@@ -227,29 +227,4 @@ public class ContextManager {
 //            callbackArena.close();
         }
     }
-
-    // Chain Parameters
-    public static class ChainParams implements AutoCloseable {
-        private final MemorySegment inner;
-
-        public ChainParams(KernelTypes.ChainType chainType) throws KernelTypes.KernelException {
-            try (var arena = Arena.ofConfined()) {
-                this.inner = kernel_chain_parameters_create(chainType.toNative());
-                if (inner == MemorySegment.NULL) {
-                    throw new KernelTypes.KernelException("Failed to create chain parameters");
-                }
-            }
-        }
-
-        MemorySegment getInner() {
-            return inner;
-        }
-
-        @Override
-        public void close() {
-            if (inner != MemorySegment.NULL) {
-                kernel_context_options_destroy(inner);
-            }
-        }
-    }
 }
