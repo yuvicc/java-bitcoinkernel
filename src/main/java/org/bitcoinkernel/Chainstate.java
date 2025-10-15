@@ -3,8 +3,9 @@ package org.bitcoinkernel;
 import java.lang.foreign.*;
 
 import static org.bitcoinkernel.BitcoinKernelBindings.*;
+import static org.bitcoinkernel.Blocks.*;
+import static org.bitcoinkernel.ContextManager.*;
 
-import java.lang.foreign.MemorySegment;
 
 public class Chainstate {
 
