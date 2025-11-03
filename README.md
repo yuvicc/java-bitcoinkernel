@@ -5,6 +5,7 @@
 ## ⚠️ Status
 
 This library is **alpha**—under work in progress. APIs may change and functionality is still incomplete. Contributions and bug reports are welcome!
+You can check out this [PR](https://github.com/yuvicc/java-bitcoinkernel/pull/4) section for more details.
 
 ## Overview
 
