@@ -28,6 +28,7 @@
 #include <util/time.h>
 #include <util/vector.h>
 
+#include <string_view>
 #include <utility>
 
 using node::DumpMempool;
@@ -97,7 +98,12 @@ static RPCHelpMan sendrawtransaction()
             std::string err_string;
             AssertLockNotHeld(cs_main);
             NodeContext& node = EnsureAnyNodeContext(request.context);
-            const TransactionError err = BroadcastTransaction(node, tx, err_string, max_raw_tx_fee, /*relay=*/true, /*wait_callback=*/true);
+            const TransactionError err = BroadcastTransaction(node,
+                                                              tx,
+                                                              err_string,
+                                                              max_raw_tx_fee,
+                                                              node::TxBroadcast::MEMPOOL_AND_BROADCAST_TO_ALL,
+                                                              /*wait_callback=*/true);
             if (TransactionError::OK != err) {
                 throw JSONRPCTransactionError(err, err_string);
             }
@@ -768,7 +774,7 @@ static RPCHelpMan importmempool()
                 throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Can only import the mempool after the block download and sync is done.");
             }
 
-            const fs::path load_path{fs::u8path(request.params[0].get_str())};
+            const fs::path load_path{fs::u8path(self.Arg<std::string_view>("filepath"))};
             const UniValue& use_current_time{request.params[1]["use_current_time"]};
             const UniValue& apply_fee_delta{request.params[1]["apply_fee_delta_priority"]};
             const UniValue& apply_unbroadcast{request.params[1]["apply_unbroadcast_set"]};
@@ -936,8 +942,9 @@ static RPCHelpMan submitpackage()
         ,
         {
             {"package", RPCArg::Type::ARR, RPCArg::Optional::NO, "An array of raw transactions.\n"
-                "The package must solely consist of a child transaction and all of its unconfirmed parents, if any. None of the parents may depend on each other.\n"
-                "The package must be topologically sorted, with the child being the last element in the array.",
+                "The package must consist of a transaction with (some, all, or none of) its unconfirmed parents. A single transaction is permitted.\n"
+                "None of the parents may depend on each other. Parents that are already in mempool do not need to be present in the package.\n"
+                "The package must be topologically sorted, with the child being the last element in the array if there are multiple elements.",
                 {
                     {"rawtx", RPCArg::Type::STR_HEX, RPCArg::Optional::OMITTED, ""},
                 },
@@ -1066,7 +1073,12 @@ static RPCHelpMan submitpackage()
 
                 // We do not expect an error here; we are only broadcasting things already/still in mempool
                 std::string err_string;
-                const auto err = BroadcastTransaction(node, tx, err_string, /*max_tx_fee=*/0, /*relay=*/true, /*wait_callback=*/true);
+                const auto err = BroadcastTransaction(node,
+                                                      tx,
+                                                      err_string,
+                                                      /*max_tx_fee=*/0,
+                                                      node::TxBroadcast::MEMPOOL_AND_BROADCAST_TO_ALL,
+                                                      /*wait_callback=*/true);
                 if (err != TransactionError::OK) {
                     throw JSONRPCTransactionError(err,
                         strprintf("transaction broadcast failed: %s (%d transactions were broadcast successfully)",
