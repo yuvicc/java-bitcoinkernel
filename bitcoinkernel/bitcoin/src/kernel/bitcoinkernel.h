@@ -52,7 +52,7 @@ extern "C" {
  *
  * This header currently exposes an API for interacting with parts of Bitcoin
  * Core's consensus code. Users can validate blocks, iterate the block index,
- * read block und undo data from disk, and validate scripts. The header is
+ * read block and undo data from disk, and validate scripts. The header is
  * unversioned and not stable yet. Users should expect breaking changes. It is
  * also not yet included in releases of Bitcoin Core.
  *
@@ -144,10 +144,11 @@ typedef struct btck_ChainParameters btck_ChainParameters;
  * Opaque data structure for holding options for creating a new kernel context.
  *
  * Once a kernel context has been created from these options, they may be
- * destroyed. The options hold the notification callbacks as well as the
- * selected chain type until they are passed to the context. If no options are
- * configured, the context will be instantiated with no callbacks and for
- * mainnet. Their content and scope can be expanded over time.
+ * destroyed. The options hold the notification and validation interface
+ * callbacks as well as the selected chain type until they are passed to the
+ * context. If no options are configured, the context will be instantiated with
+ * no callbacks and for mainnet. Their content and scope can be expanded over
+ * time.
  */
 typedef struct btck_ContextOptions btck_ContextOptions;
 
@@ -185,7 +186,7 @@ typedef struct btck_BlockTreeEntry btck_BlockTreeEntry;
  * manager.
  *
  * The chainstate manager options are used to set some parameters for the
- * chainstate manager. For now it just holds default options.
+ * chainstate manager.
  */
 typedef struct btck_ChainstateManagerOptions btck_ChainstateManagerOptions;
 
@@ -266,7 +267,7 @@ typedef struct btck_TransactionInput btck_TransactionInput;
 /**
  * Opaque data structure for holding a transaction out point.
  *
- * Holds the transaction id and output index it is pointing to.
+ * Holds the txid and output index it is pointing to.
  */
 typedef struct btck_TransactionOutPoint btck_TransactionOutPoint;
 
@@ -311,7 +312,7 @@ typedef void (*btck_NotifyFatalError)(void* user_data, const char* message, size
  * Function signatures for the validation interface.
  */
 typedef void (*btck_ValidationInterfaceBlockChecked)(void* user_data, btck_Block* block, const btck_BlockValidationState* state);
-typedef void (*btck_ValidationInterfacePowValidBlock)(void* user_data, const btck_BlockTreeEntry* entry, btck_Block* block);
+typedef void (*btck_ValidationInterfacePoWValidBlock)(void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry);
 typedef void (*btck_ValidationInterfaceBlockConnected)(void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry);
 typedef void (*btck_ValidationInterfaceBlockDisconnected)(void* user_data, btck_Block* block, const btck_BlockTreeEntry* entry);
 
@@ -356,7 +357,7 @@ typedef struct {
     btck_DestroyCallback user_data_destroy;                       //!< Frees the provided user data structure.
     btck_ValidationInterfaceBlockChecked block_checked;           //!< Called when a new block has been fully validated. Contains the
                                                                   //!< result of its validation.
-    btck_ValidationInterfacePowValidBlock pow_valid_block;        //!< Called when a new block extends the header chain and has a valid transaction
+    btck_ValidationInterfacePoWValidBlock pow_valid_block;        //!< Called when a new block extends the header chain and has a valid transaction
                                                                   //!< and segwit merkle root.
     btck_ValidationInterfaceBlockConnected block_connected;       //!< Called when a block is valid and has now been connected to the best chain.
     btck_ValidationInterfaceBlockDisconnected block_disconnected; //!< Called during a re-org when a block has been removed from the best chain.
@@ -365,8 +366,12 @@ typedef struct {
 /**
  * A struct for holding the kernel notification callbacks. The user data
  * pointer may be used to point to user-defined structures to make processing
- * the notifications easier. Note that this makes it the user's responsibility
- * to ensure that the user_data outlives the kernel objects. Notifications can
+ * the notifications easier.
+ *
+ * If user_data_destroy is provided, the kernel will automatically call this
+ * callback to clean up user_data when the notification interface object is destroyed.
+ * If user_data_destroy is NULL, it is the user's responsibility to ensure that
+ * the user_data outlives the kernel objects. Notifications can
  * occur even as kernel objects are deleted, so care has to be taken to ensure
  * safe unwinding.
  */
@@ -381,7 +386,7 @@ typedef struct {
     btck_NotifyWarningSet warning_set;      //!< A warning issued by the kernel library during validation.
     btck_NotifyWarningUnset warning_unset;  //!< A previous condition leading to the issuance of a warning is no longer given.
     btck_NotifyFlushError flush_error;      //!< An error encountered when flushing data to disk.
-    btck_NotifyFatalError fatal_error;      //!< A un-recoverable system error encountered by the library.
+    btck_NotifyFatalError fatal_error;      //!< An unrecoverable system error encountered by the library.
 } btck_NotificationInterfaceCallbacks;
 
 /**
@@ -425,9 +430,9 @@ typedef struct {
  * A collection of status codes that may be issued by the script verify function.
  */
 typedef uint8_t btck_ScriptVerifyStatus;
-#define btck_ScriptVerifyStatus_SCRIPT_VERIFY_OK ((btck_ScriptVerifyStatus)(0))
-#define btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION ((btck_ScriptVerifyStatus)(2)) //!< The flags were combined in an invalid way.
-#define btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED ((btck_ScriptVerifyStatus)(3))    //!< The taproot flag was set, so valid spent_outputs have to be provided.
+#define btck_ScriptVerifyStatus_OK ((btck_ScriptVerifyStatus)(0))
+#define btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION ((btck_ScriptVerifyStatus)(1)) //!< The flags were combined in an invalid way.
+#define btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED ((btck_ScriptVerifyStatus)(2))    //!< The taproot flag was set, so valid spent_outputs have to be provided.
 
 /**
  * Script verification flags that may be composed with each other.
@@ -464,12 +469,12 @@ typedef uint8_t btck_ChainType;
 /**
  * @brief Create a new transaction from the serialized data.
  *
- * @param[in] raw_transaction     Non-null.
+ * @param[in] raw_transaction     Serialized transaction.
  * @param[in] raw_transaction_len Length of the serialized transaction.
  * @return                        The transaction, or null on error.
  */
 BITCOINKERNEL_API btck_Transaction* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_create(
-    const void* raw_transaction, size_t raw_transaction_len) BITCOINKERNEL_ARG_NONNULL(1);
+    const void* raw_transaction, size_t raw_transaction_len);
 
 /**
  * @brief Copy a transaction. Transactions are reference counted, so this just
@@ -481,9 +486,9 @@ BITCOINKERNEL_API btck_Transaction* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transa
 BITCOINKERNEL_API btck_Transaction* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_copy(
     const btck_Transaction* transaction) BITCOINKERNEL_ARG_NONNULL(1);
 
-/*
+/**
  * @brief Serializes the transaction through the passed in callback to bytes.
- * This is consensus serialization that is also used for the p2p network.
+ * This is consensus serialization that is also used for the P2P network.
  *
  * @param[in] transaction Non-null.
  * @param[in] writer      Non-null, callback to a write bytes function.
@@ -511,7 +516,7 @@ BITCOINKERNEL_API size_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_count
  * transaction.
  *
  * @param[in] transaction  Non-null.
- * @param[in] output_index The index of the transaction to be retrieved.
+ * @param[in] output_index The index of the transaction output to be retrieved.
  * @return                 The transaction output
  */
 BITCOINKERNEL_API const btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_get_output_at(
@@ -539,7 +544,8 @@ BITCOINKERNEL_API size_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_count
     const btck_Transaction* transaction) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Get the txid of a transaction.
+ * @brief Get the txid of a transaction. The returned txid is not owned and
+ * depends on the lifetime of the transaction.
  *
  * @param[in] transaction Non-null.
  * @return                The txid.
@@ -561,12 +567,12 @@ BITCOINKERNEL_API void btck_transaction_destroy(btck_Transaction* transaction);
 
 /**
  * @brief Create a script pubkey from serialized data.
- * @param[in] script_pubkey     Non-null.
+ * @param[in] script_pubkey     Serialized script pubkey.
  * @param[in] script_pubkey_len Length of the script pubkey data.
  * @return                      The script pubkey.
  */
 BITCOINKERNEL_API btck_ScriptPubkey* BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_pubkey_create(
-    const void* script_pubkey, size_t script_pubkey_len) BITCOINKERNEL_ARG_NONNULL(1);
+    const void* script_pubkey, size_t script_pubkey_len);
 
 /**
  * @brief Copy a script pubkey.
@@ -580,7 +586,7 @@ BITCOINKERNEL_API btck_ScriptPubkey* BITCOINKERNEL_WARN_UNUSED_RESULT btck_scrip
 /**
  * @brief Verify if the input at input_index of tx_to spends the script pubkey
  * under the constraints specified by flags. If the
- * `btck_SCRIPT_FLAGS_VERIFY_WITNESS` flag is set in the flags bitfield, the
+ * `btck_ScriptVerificationFlags_WITNESS` flag is set in the flags bitfield, the
  * amount parameter is used. If the taproot flag is set, the spent outputs
  * parameter is used to validate taproot transactions.
  *
@@ -592,9 +598,8 @@ BITCOINKERNEL_API btck_ScriptPubkey* BITCOINKERNEL_WARN_UNUSED_RESULT btck_scrip
  *                              outputs spent by the transaction.
  * @param[in] spent_outputs_len Length of the spent_outputs array.
  * @param[in] input_index       Index of the input in tx_to spending the script_pubkey.
- * @param[in] flags             Bitfield of btck_ScriptFlags controlling validation constraints.
- * @param[out] status           Nullable, will be set to an error code if the operation fails.
- *                              Should be set to btck_SCRIPT_VERIFY_OK.
+ * @param[in] flags             Bitfield of btck_ScriptVerificationFlags controlling validation constraints.
+ * @param[out] status           Nullable, will be set to an error code if the operation fails, or OK otherwise.
  * @return                      1 if the script is valid, 0 otherwise.
  */
 BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_pubkey_verify(
@@ -603,10 +608,10 @@ BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_script_pubkey_verify
     const btck_Transaction* tx_to,
     const btck_TransactionOutput** spent_outputs, size_t spent_outputs_len,
     unsigned int input_index,
-    unsigned int flags,
+    btck_ScriptVerificationFlags flags,
     btck_ScriptVerifyStatus* status) BITCOINKERNEL_ARG_NONNULL(1, 3);
 
-/*
+/**
  * @brief Serializes the script pubkey through the passed in callback to bytes.
  *
  * @param[in] script_pubkey Non-null.
@@ -669,7 +674,7 @@ BITCOINKERNEL_API int64_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_outp
  *  @param[in] transaction_output Non-null.
  *  @return                       The copied transaction output.
  */
-BITCOINKERNEL_API btck_TransactionOutput* btck_transaction_output_copy(
+BITCOINKERNEL_API btck_TransactionOutput* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_output_copy(
     const btck_TransactionOutput* transaction_output) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
@@ -689,9 +694,19 @@ BITCOINKERNEL_API void btck_transaction_output_destroy(btck_TransactionOutput* t
  * buffered internally anymore once this is called and the buffer is cleared.
  * This function should only be called once and is not thread or re-entry safe.
  * Log messages will be buffered until this function is called, or a logging
- * connection is created.
+ * connection is created. This must not be called while a logging connection
+ * already exists.
  */
 BITCOINKERNEL_API void btck_logging_disable();
+
+/**
+ * @brief Set some options for the global internal logger. This changes global
+ * settings and will override settings for all existing @ref
+ * btck_LoggingConnection instances.
+ *
+ * @param[in] options Sets formatting options of the log messages.
+ */
+BITCOINKERNEL_API void btck_logging_set_options(const btck_LoggingOptions options);
 
 /**
  * @brief Set the log level of the global internal logger. This does not
@@ -700,9 +715,12 @@ BITCOINKERNEL_API void btck_logging_disable();
  * setting and will override settings for all existing
  * @ref btck_LoggingConnection instances.
  *
- * @param[in] category If btck_LOG_ALL is chosen, all messages at the specified level
- *                     will be logged. Otherwise only messages from the specified category
- *                     will be logged at the specified level and above.
+ * @param[in] category If btck_LogCategory_ALL is chosen, sets both the global fallback log level
+ *                     used by all categories that don't have a specific level set, and also
+ *                     sets the log level for messages logged with the btck_LogCategory_ALL category itself.
+ *                     For any other category, sets a category-specific log level that overrides
+ *                     the global fallback for that category only.
+
  * @param[in] level    Log level at which the log category is set.
  */
 BITCOINKERNEL_API void btck_logging_set_level_category(btck_LogCategory category, btck_LogLevel level);
@@ -712,7 +730,7 @@ BITCOINKERNEL_API void btck_logging_set_level_category(btck_LogCategory category
  * changes a global setting and will override settings for all existing @ref
  * btck_LoggingConnection instances.
  *
- * @param[in] category If btck_LOG_ALL is chosen, all categories will be enabled.
+ * @param[in] category If btck_LogCategory_ALL is chosen, all categories will be enabled.
  */
 BITCOINKERNEL_API void btck_logging_enable_category(btck_LogCategory category);
 
@@ -721,7 +739,7 @@ BITCOINKERNEL_API void btck_logging_enable_category(btck_LogCategory category);
  * changes a global setting and will override settings for all existing @ref
  * btck_LoggingConnection instances.
  *
- * @param[in] category If btck_LOG_ALL is chosen, all categories will be disabled.
+ * @param[in] category If btck_LogCategory_ALL is chosen, all categories will be disabled.
  */
 BITCOINKERNEL_API void btck_logging_disable_category(btck_LogCategory category);
 
@@ -736,14 +754,12 @@ BITCOINKERNEL_API void btck_logging_disable_category(btck_LogCategory category);
  *                                       is also defined it is assumed that ownership of the user_data is passed
  *                                       to the created logging connection.
  * @param[in] user_data_destroy_callback Nullable, function for freeing the user data.
- * @param[in] options                    Sets formatting options of the log messages.
  * @return                               A new kernel logging connection, or null on error.
  */
 BITCOINKERNEL_API btck_LoggingConnection* BITCOINKERNEL_WARN_UNUSED_RESULT btck_logging_connection_create(
     btck_LogCallback log_callback,
     void* user_data,
-    btck_DestroyCallback user_data_destroy_callback,
-    const btck_LoggingOptions options) BITCOINKERNEL_ARG_NONNULL(1);
+    btck_DestroyCallback user_data_destroy_callback) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * Stop logging and destroy the logging connection.
@@ -861,7 +877,7 @@ BITCOINKERNEL_API btck_Context* BITCOINKERNEL_WARN_UNUSED_RESULT btck_context_co
  * when reindexing, importing or processing blocks.
  *
  * @param[in] context  Non-null.
- * @return             0 if the interrupt was successfully, non-zero otherwise.
+ * @return             0 if the interrupt was successful, non-zero otherwise.
  */
 BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_context_interrupt(
     btck_Context* context) BITCOINKERNEL_ARG_NONNULL(1);
@@ -879,7 +895,7 @@ BITCOINKERNEL_API void btck_context_destroy(btck_Context* context);
 ///@{
 
 /**
- * @brief Returns the previous block tree entry in the chain, or null if the current
+ * @brief Returns the previous block tree entry in the tree, or null if the current
  * block tree entry is the genesis block.
  *
  * @param[in] block_tree_entry Non-null.
@@ -903,7 +919,7 @@ BITCOINKERNEL_API int32_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_tree_entry
  * @param[in] block_tree_entry Non-null.
  * @return                     The block hash.
  */
-BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_tree_entry_get_block_hash(
+BITCOINKERNEL_API const btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_tree_entry_get_block_hash(
     const btck_BlockTreeEntry* block_tree_entry) BITCOINKERNEL_ARG_NONNULL(1);
 
 ///@}
@@ -953,7 +969,7 @@ BITCOINKERNEL_API void btck_chainstate_manager_options_set_worker_threads_num(
  * @param[in] wipe_chainstate_db         Set wipe chainstate db.
  * @return                               0 if the set was successful, non-zero if the set failed.
  */
-BITCOINKERNEL_API int btck_chainstate_manager_options_set_wipe_dbs(
+BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_chainstate_manager_options_set_wipe_dbs(
     btck_ChainstateManagerOptions* chainstate_manager_options,
     int wipe_block_tree_db,
     int wipe_chainstate_db) BITCOINKERNEL_ARG_NONNULL(1);
@@ -1002,8 +1018,8 @@ BITCOINKERNEL_API btck_ChainstateManager* BITCOINKERNEL_WARN_UNUSED_RESULT btck_
     const btck_ChainstateManagerOptions* chainstate_manager_options) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Triggers the start of a reindex if the option was previously set for
- * the chainstate and block manager. Can also import an array of existing block
+ * @brief Triggers the start of a reindex if the wipe options were previously
+ * set for the chainstate manager. Can also import an array of existing block
  * files selected by the user.
  *
  * @param[in] chainstate_manager        Non-null.
@@ -1012,10 +1028,10 @@ BITCOINKERNEL_API btck_ChainstateManager* BITCOINKERNEL_WARN_UNUSED_RESULT btck_
  * @param[in] block_file_paths_data_len Length of the block_file_paths_data and block_file_paths_len arrays.
  * @return                              0 if the import blocks call was completed successfully, non-zero otherwise.
  */
-BITCOINKERNEL_API int btck_chainstate_manager_import_blocks(
+BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_chainstate_manager_import_blocks(
     btck_ChainstateManager* chainstate_manager,
     const char** block_file_paths_data, size_t* block_file_paths_lens,
-    size_t block_file_paths_data_len) BITCOINKERNEL_ARG_NONNULL(1, 2);
+    size_t block_file_paths_data_len) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
  * @brief Process and validate the passed in block with the chainstate
@@ -1042,11 +1058,13 @@ BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_chainstate_manager_p
 /**
  * @brief Returns the best known currently active chain. Its lifetime is
  * dependent on the chainstate manager. It can be thought of as a view on a
- * vector of block tree entries that form the best chain. This means state
- * transitions within the chainstate manager, e.g. processing blocks, will
- * change the chain. Data retrieved from this chain is only consistent up to
- * the point when new data is processed in the chainstate manager. It is the
- * user's responsibility to guard against these inconsistencies.
+ * vector of block tree entries that form the best chain. The returned chain
+ * reference always points to the currently active best chain. However, state
+ * transitions within the chainstate manager (e.g., processing blocks) will
+ * update the chain's contents. Data retrieved from this chain is only
+ * consistent up to the point when new data is processed in the chainstate
+ * manager. It is the user's responsibility to guard against these
+ * inconsistencies.
  *
  * @param[in] chainstate_manager Non-null.
  * @return                       The chain.
@@ -1093,12 +1111,12 @@ BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_read(
 /**
  * @brief Parse a serialized raw block into a new block object.
  *
- * @param[in] raw_block     Non-null, serialized block.
+ * @param[in] raw_block     Serialized block.
  * @param[in] raw_block_len Length of the serialized block.
  * @return                  The allocated block, or null on error.
  */
 BITCOINKERNEL_API btck_Block* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_create(
-    const void* raw_block, size_t raw_block_len) BITCOINKERNEL_ARG_NONNULL(1);
+    const void* raw_block, size_t raw_block_len);
 
 /**
  * @brief Copy a block. Blocks are reference counted, so this just increments
@@ -1130,7 +1148,7 @@ BITCOINKERNEL_API size_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_count_trans
 BITCOINKERNEL_API const btck_Transaction* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_get_transaction_at(
     const btck_Block* block, size_t transaction_index) BITCOINKERNEL_ARG_NONNULL(1);
 
-/*
+/**
  * @brief Calculate and return the hash of a block.
  *
  * @param[in] block Non-null.
@@ -1139,9 +1157,9 @@ BITCOINKERNEL_API const btck_Transaction* BITCOINKERNEL_WARN_UNUSED_RESULT btck_
 BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_get_hash(
     const btck_Block* block) BITCOINKERNEL_ARG_NONNULL(1);
 
-/*
+/**
  * @brief Serializes the block through the passed in callback to bytes.
- * This is consensus serialization that is also used for the p2p network.
+ * This is consensus serialization that is also used for the P2P network.
  *
  * @param[in] block     Non-null.
  * @param[in] writer    Non-null, callback to a write bytes function.
@@ -1186,31 +1204,12 @@ BITCOINKERNEL_API btck_BlockValidationResult btck_block_validation_state_get_blo
 ///@{
 
 /**
- * @brief Get the block tree entry of the current chain tip. Once returned,
- * there is no guarantee that it remains in the active chain.
- *
- * @param[in] chain Non-null.
- * @return          The block tree entry of the current tip, or null if the chain is empty.
- */
-BITCOINKERNEL_API const btck_BlockTreeEntry* BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_tip(
-    const btck_Chain* chain) BITCOINKERNEL_ARG_NONNULL(1);
-
-/**
  * @brief Return the height of the tip of the chain.
  *
  * @param[in] chain Non-null.
  * @return          The current height.
  */
-BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_height(
-    const btck_Chain* chain) BITCOINKERNEL_ARG_NONNULL(1);
-
-/*
- * @brief Get the block tree entry of the genesis block.
- *
- * @param[in] chain Non-null.
- * @return          The block tree entry of the genesis block, or null if the chain is empty.
- */
-BITCOINKERNEL_API const btck_BlockTreeEntry* BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_genesis(
+BITCOINKERNEL_API int32_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_get_height(
     const btck_Chain* chain) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
@@ -1234,7 +1233,7 @@ BITCOINKERNEL_API const btck_BlockTreeEntry* BITCOINKERNEL_WARN_UNUSED_RESULT bt
  * @return                     1 if the block_tree_entry is in the chain, 0 otherwise.
  *
  */
-BITCOINKERNEL_API int btck_chain_contains(
+BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_chain_contains(
     const btck_Chain* chain,
     const btck_BlockTreeEntry* block_tree_entry) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
@@ -1387,21 +1386,22 @@ BITCOINKERNEL_API btck_TransactionOutPoint* BITCOINKERNEL_WARN_UNUSED_RESULT btc
     const btck_TransactionOutPoint* transaction_out_point) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Get the output position from the out point.
+ * @brief Get the output position from the transaction out point.
  *
  * @param[in] transaction_out_point Non-null.
  * @return                          The output index.
  */
-BITCOINKERNEL_API uint32_t btck_transaction_out_point_get_index(
+BITCOINKERNEL_API uint32_t BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_out_point_get_index(
     const btck_TransactionOutPoint* transaction_out_point) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Get the txid from the out point.
+ * @brief Get the txid from the transaction out point. The returned txid is
+ * not owned and depends on the lifetime of the transaction out point.
  *
  * @param[in] transaction_out_point Non-null.
  * @return                          The txid.
  */
-BITCOINKERNEL_API const btck_Txid* btck_transaction_out_point_get_txid(
+BITCOINKERNEL_API const btck_Txid* BITCOINKERNEL_WARN_UNUSED_RESULT btck_transaction_out_point_get_txid(
     const btck_TransactionOutPoint* transaction_out_point) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
@@ -1432,7 +1432,7 @@ BITCOINKERNEL_API btck_Txid* BITCOINKERNEL_WARN_UNUSED_RESULT btck_txid_copy(
  * @param[in] txid2 Non-null.
  * @return          0 if the txid is not equal.
  */
-BITCOINKERNEL_API int btck_txid_equals(
+BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_txid_equals(
     const btck_Txid* txid1, const btck_Txid* txid2) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
 /**
@@ -1468,7 +1468,8 @@ BITCOINKERNEL_API btck_Coin* BITCOINKERNEL_WARN_UNUSED_RESULT btck_coin_copy(
     const btck_Coin* coin) BITCOINKERNEL_ARG_NONNULL(1);
 
 /**
- * @brief Returns the height of the block that contains the coin's prevout.
+ * @brief Returns the block height where the transaction that
+ * created this coin was included in.
  *
  * @param[in] coin Non-null.
  * @return         The block height of the coin.
@@ -1520,7 +1521,7 @@ BITCOINKERNEL_API btck_BlockHash* BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_ha
  * @param[in] hash2 Non-null.
  * @return          0 if the block hashes are not equal.
  */
-BITCOINKERNEL_API int btck_block_hash_equals(
+BITCOINKERNEL_API int BITCOINKERNEL_WARN_UNUSED_RESULT btck_block_hash_equals(
     const btck_BlockHash* hash1, const btck_BlockHash* hash2) BITCOINKERNEL_ARG_NONNULL(1, 2);
 
 /**

@@ -39,7 +39,7 @@
 #include <node/txreconciliation.h>
 #include <node/warnings.h>
 #include <policy/feerate.h>
-#include <policy/fees.h>
+#include <policy/fees/block_policy_estimator.h>
 #include <policy/packages.h>
 #include <policy/policy.h>
 #include <primitives/block.h>
@@ -1393,17 +1393,16 @@ void PeerManagerImpl::FindNextBlocksToDownload(const Peer& peer, unsigned int co
         return;
     }
 
-    // Bootstrap quickly by guessing a parent of our best tip is the forking point.
-    // Guessing wrong in either direction is not a problem.
-    // Also reset pindexLastCommonBlock after a snapshot was loaded, so that blocks after the snapshot will be prioritised for download.
+    // Determine the forking point between the peer's chain and our chain:
+    // pindexLastCommonBlock is required to be an ancestor of pindexBestKnownBlock, and will be used as a starting point.
+    // It is being set to the fork point between the peer's best known block and the current tip, unless it is already set to
+    // an ancestor with more work than the fork point.
+    auto fork_point = LastCommonAncestor(state->pindexBestKnownBlock, m_chainman.ActiveTip());
     if (state->pindexLastCommonBlock == nullptr ||
-        (snap_base && state->pindexLastCommonBlock->nHeight < snap_base->nHeight)) {
-        state->pindexLastCommonBlock = m_chainman.ActiveChain()[std::min(state->pindexBestKnownBlock->nHeight, m_chainman.ActiveChain().Height())];
+        fork_point->nChainWork > state->pindexLastCommonBlock->nChainWork ||
+        state->pindexBestKnownBlock->GetAncestor(state->pindexLastCommonBlock->nHeight) != state->pindexLastCommonBlock) {
+        state->pindexLastCommonBlock = fork_point;
     }
-
-    // If the peer reorganized, our previous pindexLastCommonBlock may not be an ancestor
-    // of its current tip anymore. Go back enough to fix that.
-    state->pindexLastCommonBlock = LastCommonAncestor(state->pindexLastCommonBlock, state->pindexBestKnownBlock);
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
         return;
 
@@ -2660,7 +2659,7 @@ bool PeerManagerImpl::TryLowWorkHeadersSync(Peer& peer, CNode& pfrom, const CBlo
             // advancing to the first unknown header would be a small effect.
             LOCK(peer.m_headers_sync_mutex);
             peer.m_headers_sync.reset(new HeadersSyncState(peer.m_id, m_chainparams.GetConsensus(),
-                chain_start_header, minimum_chain_work));
+                m_chainparams.HeadersSync(), chain_start_header, minimum_chain_work));
 
             // Now a HeadersSyncState object for tracking this synchronization
             // is created, process the headers using it as normal. Failures are
@@ -4118,6 +4117,11 @@ void PeerManagerImpl::ProcessMessage(CNode& pfrom, const std::string& msg_type, 
     if (msg_type == NetMsgType::GETBLOCKTXN) {
         BlockTransactionsRequest req;
         vRecv >> req;
+        // Verify differential encoding invariant: indexes must be strictly increasing
+        // DifferenceFormatter should guarantee this property during deserialization
+        for (size_t i = 1; i < req.indexes.size(); ++i) {
+            Assume(req.indexes[i] > req.indexes[i-1]);
+        }
 
         std::shared_ptr<const CBlock> recent_block;
         {
