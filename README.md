@@ -23,15 +23,15 @@ We vendor Bitcoin Core’s `libbitcoinkernel` using a Git subtree targeting the 
 ```bash
 git subtree pull \
   --prefix bitcoinkernel/bitcoin \
-  https://github.com/TheCharlatan/bitcoin \
-  kernelApi --squash
+  https://github.com/bitcoin/bitcoin \
+  master --squash
 ```
 
 ## Requirements
 - CMake
 - C++17 compiler (e.g. GCC/Clang)
 - Boost
-- JDK 21+ with FFM support
+- JDK 25+ with FFM support
 
 Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md) for dependency specifics.
 
@@ -50,7 +50,6 @@ Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/
 
 
 ## References
-- Upstream PR of C header API library -> https://github.com/bitcoin/bitcoin/pull/30595
 - [rust-bitcoinkernel wrapper](https://github.com/yuvicc/rust-bitcoinkernel)
 
 ## Current Status of the Library
