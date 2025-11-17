@@ -236,11 +236,11 @@ public class Transactions {
     }
 
     // ===== Transaction Spent Outputs
-    public static class TransactionsSpentOutputs implements Iterable<Coin> {
+    public static class TransactionSpentOutputs implements Iterable<Coin> {
         private final MemorySegment inner;
         private final boolean ownsMemory;
 
-        TransactionsSpentOutputs(MemorySegment inner) {
+        TransactionSpentOutputs(MemorySegment inner) {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalArgumentException("Transaction Outputs cannot be null");
             }
@@ -248,7 +248,7 @@ public class Transactions {
             this.ownsMemory = false;
         }
 
-        private TransactionsSpentOutputs(MemorySegment inner, boolean ownsMemory) {
+        private TransactionSpentOutputs(MemorySegment inner, boolean ownsMemory) {
             this.inner = inner;
             this.ownsMemory = ownsMemory;
         }
@@ -265,12 +265,12 @@ public class Transactions {
             return new Coin(coinPtr);
         }
 
-        public TransactionsSpentOutputs copy() {
+        public TransactionSpentOutputs copy() {
             MemorySegment copied = btck_transaction_spent_outputs_copy(inner);
             if (copied == MemorySegment.NULL) {
                 throw new RuntimeException("Failed to copy coin object");
             }
-            return new TransactionsSpentOutputs(inner, true);
+            return new TransactionSpentOutputs(inner, true);
         }
 
         @Override

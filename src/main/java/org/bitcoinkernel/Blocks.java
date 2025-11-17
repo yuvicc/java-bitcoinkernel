@@ -1,40 +1,74 @@
 package org.bitcoinkernel;
 
 import java.lang.foreign.*;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-import static org.bitcoinkernel.BitcoinKernelBindings.*;
 import static org.bitcoinkernel.Transactions.*;
 
+import static org.bitcoinkernel.jextract.bitcoinkernel_h.*;
+
 public class Blocks {
+
+    public enum ValidationMode {
+        VALID(0),
+        INVALID(1),
+        INTERNAL_ERROR(2);
+
+        private final byte value;
+
+        ValidationMode(int value) {
+            this.value = (byte) value;
+        }
+
+        public byte getValue() {
+            return value;
+        }
+
+        public static ValidationMode fromByte(byte value) {
+            for (ValidationMode mode : values()) {
+                if (mode.value == value) {
+                    return mode;
+                }
+            }
+            throw new IllegalArgumentException("Invalid Validation Mode: " + value);
+        }
+    }
+
+    public enum BlockValidationResult {
+        UNSET(0),
+        CONSENSUS(1),
+        CACHE_INVALID(2),
+        INVALID_HEADER(3),
+        MUTATED(4),
+        MISSING_PREV(5),
+        INVALID_PREV(6),
+        TIME_FUTURE(7),
+        HEADER_LOW_WORK(8);
+
+        private final int value;
+
+        BlockValidationResult(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
+
+        public static BlockValidationResult fromInt(int value) {
+            for (BlockValidationResult result : values()) {
+                if (result.value == value) {
+                    return result;
+                }
+            }
+            throw new IllegalArgumentException("Invalid BlockValidationResult: " + value);
+        }
+    }
 
     // ===== Block Validation State =====
     public static class BlockValidationState {
         private final MemorySegment inner;
-
-        public enum ValidationMode {
-            VALID(0),
-            INVALID(1),
-            INTERNAL_ERROR(2);
-
-            private final byte value;
-
-            ValidationMode(int value) {
-                this.value = (byte) value;
-            }
-
-            public byte getValue() {
-                return value;
-            }
-
-            public static ValidationMode fromByte(byte value) {
-                for (ValidationMode mode : values()) {
-                    if (mode.value == value) {
-                        return mode;
-                    }
-                }
-                throw new IllegalArgumentException("Invalid Validation Mode: " + value);
-            }
-        }
 
         public enum BlockValidationResult {
             UNSET(0),
@@ -74,60 +108,28 @@ public class Blocks {
             this.inner = inner;
         }
 
-        /**
-         * Get the validation mode indicating whether the block is valid, invalid,
-         * or an error occurred during validation.
-         *
-         * @return The validation mode
-         */
         public ValidationMode getValidationMode() {
             byte mode = btck_block_validation_state_get_validation_mode(inner);
             return ValidationMode.fromByte(mode);
         }
 
-        /**
-         * Get the specific reason why a block was invalid (if applicable).
-         * Only meaningful when ValidationMode is INVALID.
-         *
-         * @return The block validation result
-         */
         public BlockValidationResult getBlockValidationResult() {
             int result = btck_block_validation_state_get_block_validation_result(inner);
             return BlockValidationResult.fromInt(result);
         }
 
-        /**
-         * Check if the block is valid.
-         *
-         * @return true if ValidationMode is VALID, false otherwise
-         */
         public boolean isValid() {
             return getValidationMode() == ValidationMode.VALID;
         }
 
-        /**
-         * Check if the block is invalid.
-         *
-         * @return true if ValidationMode is INVALID, false otherwise
-         */
         public boolean isInvalid() {
             return getValidationMode() == ValidationMode.INVALID;
         }
 
-        /**
-         * Check if there was an error during validation
-         *
-         * @return true if ValidationMode is INTERNAL_ERROR, false otherwise
-         */
         public boolean hasError() {
             return getValidationMode() == ValidationMode.INTERNAL_ERROR;
         }
 
-        /**
-         * Get a human readable description of the validation state
-         *
-         * @return A string describing the validation state
-         */
         public String getDescription() {
             ValidationMode mode = getValidationMode();
             if (mode == ValidationMode.VALID) {
@@ -156,6 +158,7 @@ public class Blocks {
     public static class BlockHash implements AutoCloseable {
         private MemorySegment inner;
         private final Arena arena;
+        private final boolean ownsMemory;
 
         public BlockHash(byte[] hash) throws KernelTypes.KernelException {
             if (hash.length != 32) {
@@ -168,12 +171,14 @@ public class Blocks {
             if (inner == MemorySegment.NULL) {
                 throw new KernelTypes.KernelException("Failed to instantiate Block Hash object");
             }
+            this.ownsMemory = true;
         }
 
         // Internal structure for hashes returned by the API
-        BlockHash(MemorySegment inner) {
+        BlockHash(MemorySegment inner, boolean ownsMemory) {
             this.inner = inner;
             this.arena = null;
+            this.ownsMemory = ownsMemory;
         }
 
         public byte[] toBytes() {
@@ -189,6 +194,15 @@ public class Blocks {
             checkClosed();
             other.checkClosed();
             return btck_block_hash_equals(inner, other.inner) != 0;
+        }
+
+        public BlockHash copy() {
+            checkClosed();
+            MemorySegment copied = btck_block_hash_copy(inner);
+            if (copied == MemorySegment.NULL) {
+                throw new RuntimeException("Failed to copy BlockHash");
+            }
+            return new BlockHash(copied, true);
         }
 
         @Override
@@ -249,7 +263,7 @@ public class Blocks {
 
         public BlockHash getBlockHash() {
             MemorySegment hashPtr = btck_block_tree_entry_get_block_hash(inner);
-            return new BlockHash(hashPtr);
+            return new BlockHash(hashPtr, false);
         }
 
         MemorySegment getInner() {
@@ -257,25 +271,149 @@ public class Blocks {
         }
     }
 
-    //todo!
     public static class Block implements AutoCloseable {
+        private MemorySegment inner;
+        private final Arena arena;
 
+        public Block(byte[] raw_block) throws KernelTypes.KernelException {
+            this.arena = Arena.ofConfined();
+            MemorySegment blockSegment = arena.allocateFrom(ValueLayout.JAVA_BYTE, raw_block);
+            this.inner = btck_block_create(blockSegment, blockSegment.byteSize());
+            if (inner == MemorySegment.NULL) {
+                arena.close();
+                throw new KernelTypes.KernelException("Failed to create block");
+            }
+        }
+
+        Block(MemorySegment inner) {
+            this.inner = inner;
+            this.arena = null;
+        }
+
+        public BlockHash getHash() {
+            checkClosed();
+            MemorySegment hashPtr = btck_block_get_hash(inner);
+            return new BlockHash(hashPtr, true);
+        }
+
+        public long countTransaction() {
+            return btck_block_count_transactions(inner);
+        }
+
+        public Transaction getTransaction(long index) {
+            checkClosed();
+            if (index < 0 || index >= countTransaction()) {
+                throw new IndexOutOfBoundsException("Transaction index out of bounds: " + index);
+            }
+            MemorySegment txPtr = btck_block_get_transaction_at(inner, index);
+            return new Transaction(txPtr);
+        }
+
+        public byte[] toBytes() {
+            checkClosed();
+            throw new UnsupportedOperationException("Block serialization not yet implemented");
+        }
+
+        MemorySegment getInner() {
+            return inner;
+        }
+
+        private void checkClosed() {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalStateException("Block has been closed");
+            }
+        }
 
         @Override
         public void close() throws Exception {
-
+            if (inner != MemorySegment.NULL) {
+                btck_block_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
+            if (arena != null) {
+                arena.close();
+            }
         }
     }
 
     // ===== Block Spent Outputs =====
-    public static class BlockSpentOutputs implements AutoCloseable {
-        private final MemorySegment inner;
+    public static class BlockSpentOutputs implements AutoCloseable, Iterable<TransactionSpentOutputs> {
+        private MemorySegment inner;
+        private final boolean ownsMemory;
 
+        BlockSpentOutputs(MemorySegment inner) {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalArgumentException("BlockSpentOutputs cannot be null");
+            }
+            this.inner = inner;
+            this.ownsMemory = true;
+        }
 
+        private BlockSpentOutputs(MemorySegment inner, boolean ownsMemory) {
+            this.inner = inner;
+            this.ownsMemory = ownsMemory;
+        }
+
+        public long count() {
+            checkClosed();
+            return btck_block_spent_outputs_count(inner);
+        }
+
+        public TransactionSpentOutputs getTransactionSpentOutputs(long index) {
+            checkClosed();
+            if (index < 0 || index >= count()) {
+                throw new IndexOutOfBoundsException("Transaction Spend Outputs index out of bounds: " + index);
+            }
+            MemorySegment txSpentOutputsPtr = btck_block_spent_outputs_get_transaction_spent_outputs_at(inner, index);
+            return new TransactionSpentOutputs(txSpentOutputsPtr);
+        }
+
+        public BlockSpentOutputs copy() {
+            checkClosed();
+            MemorySegment copied = btck_block_spent_outputs_copy(inner);
+            if (copied == MemorySegment.NULL) {
+                throw new RuntimeException("Failed to copy block spent outputs");
+            }
+            return new BlockSpentOutputs(copied, true);
+        }
 
         @Override
-        public void close() throws Exception {
+        public Iterator<TransactionSpentOutputs> iterator() {
+            return new Iterator<>() {
+                private long currentIndex = 0;
+                private final long size = count();
 
+                @Override
+                public boolean hasNext() {
+                    return currentIndex < size;
+                }
+
+                @Override
+                public TransactionSpentOutputs next() {
+                    if (!hasNext()) {
+                        throw new NoSuchElementException();
+                    }
+                    return getTransactionSpentOutputs(currentIndex++);
+                }
+            };
+        }
+
+        MemorySegment getInner() {
+            return inner;
+        }
+
+        private void checkClosed() {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalStateException("BlockSpentOutputs has been closed");
+            }
+        }
+
+        @Override
+        public void close() {
+            if (inner != MemorySegment.NULL && ownsMemory) {
+                btck_block_spent_outputs_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
         }
     }
 }
