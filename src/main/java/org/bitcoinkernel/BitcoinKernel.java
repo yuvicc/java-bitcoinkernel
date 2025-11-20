@@ -2,30 +2,39 @@ package org.bitcoinkernel;
 
 import java.lang.foreign.*;
 import java.nio.file.Path;
-import java.util.List;
+import java.util.function.Consumer;
 
-import static org.bitcoinkernel.BitcoinKernelBindings.*;
+import static org.bitcoinkernel.jextract.bitcoinkernel_h.*;
+import static org.bitcoinkernel.Chainstate.*;
+import static org.bitcoinkernel.Blocks.*;
+import static org.bitcoinkernel.KernelData.*;
+import static org.bitcoinkernel.Transactions.*;
 
-// This serves as the entry point for the library
+/**
+ * Main entry point for the Bitcoin Kernel library.
+ *
+ * This class provides a high-level API for interacting with Bitcoin Core's
+ * consensus validation engine.
+ */
 public class BitcoinKernel implements AutoCloseable {
 
-    // Script Verification Flags
-    public static final int VERIFY_NONE = kernel_SCRIPT_FLAGS_VERIFY_NONE();
-    public static final int VERIFY_P2SH = kernel_SCRIPT_FLAGS_VERIFY_P2SH();
-    public static final int VERIFY_DERSIG = kernel_SCRIPT_FLAGS_VERIFY_DERSIG();
-    public static final int VERIFY_NULLDUMMY = kernel_SCRIPT_FLAGS_VERIFY_NULLDUMMY();
-    public static final int VERIFY_CHECKLOCKTIMEVERIFY = kernel_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY();
-    public static final int VERIFY_CHECKSEQUENCEVERIFY = kernel_SCRIPT_FLAGS_VERIFY_CHECKSEQUENCEVERIFY();
-    public static final int VERIFY_WITNESS = kernel_SCRIPT_FLAGS_VERIFY_WITNESS();
-    public static final int VERIFY_TAPROOT = kernel_SCRIPT_FLAGS_VERIFY_TAPROOT();
-    public static final int VERIFY_ALL = kernel_SCRIPT_FLAGS_VERIFY_ALL();
+    // Script Verification Flags - delegate to KernelTypes
+    public static final int VERIFY_NONE = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_NONE;
+    public static final int VERIFY_P2SH = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_P2SH;
+    public static final int VERIFY_DERSIG = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_DERSIG;
+    public static final int VERIFY_NULLDUMMY = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_NULLDUMMY;
+    public static final int VERIFY_CHECKLOCKTIMEVERIFY = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY;
+    public static final int VERIFY_CHECKSEQUENCEVERIFY = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_CHECKSEQUENCEVERIFY;
+    public static final int VERIFY_WITNESS = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_WITNESS;
+    public static final int VERIFY_TAPROOT = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_TAPROOT;
+    public static final int VERIFY_ALL = KernelTypes.ScriptVerificationFlags.SCRIPT_VERIFY_ALL;
 
     private final ContextManager.Context context;
-    private final MemorySegment chainstateManager;
-    private final Logger<String> logger;
+    private final ChainstateManager chainstateManager;
+    private final Consumer<String> logger;
 
     /**
-     * Constructs a BitcoinKernel instance with the specified chain type and data dirs
+     * Constructs a BitcoinKernel instance with the specified chain type and data directories.
      *
      * @param chainType The chain type (e.g., MAINNET, TESTNET, REGTEST, SIGNET, TESTNET_4)
      * @param dataDir   The path location of the chainstate data (e.g. "$HOME/.bitcoin/")
@@ -33,139 +42,149 @@ public class BitcoinKernel implements AutoCloseable {
      * @param logger    The logger for kernel events
      * @throws KernelTypes.KernelException If initialization fails
      */
-    public BitcoinKernel(KernelTypes.ChainType chainType, Path dataDir, Path blocksDir, Logger<String> logger) throws KernelTypes.KernelException {
+    public BitcoinKernel(ChainType chainType, Path dataDir, Path blocksDir, Consumer<String> logger) throws KernelTypes.KernelException {
         this.logger = logger;
-        try (var builder = new ContextManager.ContextBuilder()) {
-            this.context = builder.chainType(chainType)
-                    .notificationCallbacks(new NotificationsManager.KernelNotificationInterfaceCallbacks(
-                    ) {
-                        @Override
-                        public void blockTip(int state, MemorySegment blockIndex, double verificationProgress) {
-                            logger.log("Block tip: state=" + state + ", progress=" + verificationProgress + ", blockIndex=" + new KernelData.BlockIndex(blockIndex).height());
-                        }
 
-                        @Override
-                        public void headerTip(int state, long height, long timestamp, boolean presync) {
-                            logger.log("Header tip: height=" + height + ", presync=" + presync);
-                        }
+        // Create chain parameters
+        ChainParameters chainParams = new ChainParameters(chainType);
 
-                        @Override
-                        public void progress(MemorySegment title, int progressPercent, boolean resumePossible) {
-                            logger.log("Progress: " + title.getString(0) + " " + progressPercent + "%");
-                        }
+        // Create context options
+        ContextManager.ContextOptions contextOptions = new ContextManager.ContextOptions();
+        contextOptions.setChainParams(chainParams);
 
-                        @Override
-                        public void warningSet(int warning, MemorySegment message) {
-                            logger.log("Warning: " + message.getString(0));
-                        }
+        // Set up kernel notifications
+        NotificationsManager.KernelNotificationManager notificationManager =
+            new NotificationsManager.KernelNotificationManager(
+                new NotificationsManager.KernelNotificationInterfaceCallbacks() {
+                    @Override
+                    public void blockTip(SynchronizationState state, BlockTreeEntry blockIndex, double verificationProgress) {
+                        logger.accept("Block tip: state=" + state + ", progress=" + verificationProgress +
+                                    (blockIndex != null ? ", height=" + blockIndex.getHeight() : ""));
+                    }
 
-                        @Override
-                        public void warningUnset(int warning) {
-                            logger.log("Warning Unset: " + warning);
-                        }
+                    @Override
+                    public void headerTip(SynchronizationState state, long height, long timestamp, boolean presync) {
+                        logger.accept("Header tip: height=" + height + ", presync=" + presync);
+                    }
 
-                        @Override
-                        public void flushError(MemorySegment message) {
-                            logger.log("Flush error: " + message.getString(0));
-                        }
+                    @Override
+                    public void progress(String title, int progressPercent, boolean resumePossible) {
+                        logger.accept("Progress: " + title + " " + progressPercent + "%");
+                    }
 
-                        @Override
-                        public void fatalError(MemorySegment message) {
-                            logger.log("Fatal error: " + message.getString(0));
-                        }
-                    })
-                    .validationiInterface(new NotificationsManager.ValidationInterfaceCallbacks() {
-                        @Override
-                        public void blockChecked(MemorySegment blockPtr, MemorySegment statePtr) {
-                            KernelData.Block block = new KernelData.Block(blockPtr);
-                            KernelTypes.BlockValidationState state = new KernelTypes.BlockValidationState(statePtr);
-                            logger.log("Block checked mode=" + state.getMode() + ", Result: " + state.getResult());
-                        }
-                    })
-                    .build();
-        }
+                    @Override
+                    public void warningSet(Warning warning, String message) {
+                        logger.accept("Warning: " + message);
+                    }
 
-        try (var arena = Arena.ofConfined()) {
-            MemorySegment options = kernel_chainstate_manager_options_create(
-                    context.getInner(),
-                    arena.allocateFrom(dataDir.toString()),
-                    dataDir.toString().length(),
-                    arena.allocateFrom(blocksDir.toString()),
-                    blocksDir.toString().length()
+                    @Override
+                    public void warningUnset(Warning warning) {
+                        logger.accept("Warning Unset: " + warning);
+                    }
+
+                    @Override
+                    public void flushError(String message) {
+                        logger.accept("Flush error: " + message);
+                    }
+
+                    @Override
+                    public void fatalError(String message) {
+                        logger.accept("Fatal error: " + message);
+                    }
+                }
             );
 
-            if (options == MemorySegment.NULL) {
-                throw new KernelTypes.KernelException("Failed to create chainstate manager options");
-            }
+        contextOptions.setNotifications(notificationManager);
 
-            this.chainstateManager = kernel_chainstate_manager_create(context.getInner(), options);
-            if (chainstateManager == MemorySegment.NULL){
-                kernel_chainstate_manager_options_destroy(options);
-                throw new KernelTypes.KernelException("Failed to create chainstate manager");
-            }
-            kernel_chainstate_manager_options_destroy(options);
-        }
+        // Set up validation interface
+        NotificationsManager.ValidationInterfaceManager validationManager =
+            new NotificationsManager.ValidationInterfaceManager(
+                new NotificationsManager.ValidationInterfaceCallbacks() {
+                    @Override
+                    public void blockChecked(Block block, BlockValidationState state) {
+                        logger.accept("Block checked - Mode: " + state.getValidationMode() +
+                                    ", Result: " + state.getBlockValidationResult());
+                    }
+
+                    @Override
+                    public void powValidBlock(Block block, BlockTreeEntry blockIndex) {
+                        logger.accept("PoW valid block at height: " + blockIndex.getHeight());
+                    }
+
+                    @Override
+                    public void blockConnected(Block block, BlockTreeEntry blockIndex) {
+                        logger.accept("Block connected at height: " + blockIndex.getHeight());
+                    }
+
+                    @Override
+                    public void blockDisconnected(Block block, BlockTreeEntry blockIndex) {
+                        logger.accept("Block disconnected at height: " + blockIndex.getHeight());
+                    }
+                }
+            );
+
+        contextOptions.setValidationInterface(validationManager);
+
+        // Create context
+        this.context = new ContextManager.Context(contextOptions);
+
+        // Create chainstate manager
+        ChainstateManagerOptions chainstateOptions = new ChainstateManagerOptions(
+            context,
+            dataDir.toString(),
+            blocksDir.toString()
+        );
+
+        this.chainstateManager = new ChainstateManager(context, chainstateOptions);
     }
 
     /**
-     * Verifies a transaction input against its corresponding output script
+     * Get the chainstate manager for this kernel instance.
      *
-     * @param scriptPubkey script pubkey of the transaction
-     * @param amount amount to spend
-     * @param txTo raw transactions data
-     * @param inputIndex index of input spend
-     * @param flags verification flags
-     * @param spentOutputs spent outputs data
+     * @return The chainstate manager
      */
-    public static void verify(KernelData.ScriptPubkey scriptPubkey, Long amount, KernelData.Transaction txTo, int inputIndex, Integer flags, List<KernelData.TxOut> spentOutputs) throws KernelTypes.KernelException {
+    public ChainstateManager getChainstateManager() {
+        return chainstateManager;
+    }
 
-        try (var arena = Arena.ofConfined()) {
-            int kernelFlags = flags != null ? flags : kernel_SCRIPT_FLAGS_VERIFY_ALL();
-            long kernelAmount = amount != null ? amount : 0;
-            MemorySegment status = arena.allocate(ValueLayout.JAVA_INT, kernel_SCRIPT_VERIFY_OK());
+    /**
+     * Get the kernel context.
+     *
+     * @return The context
+     */
+    public ContextManager.Context getContext() {
+        return context;
+    }
 
-            MemorySegment spentOutputsPtr;
-            if (spentOutputs.isEmpty()) {
-                spentOutputsPtr = MemorySegment.NULL;
+    /**
+     * Verifies a transaction input against its corresponding output script.
+     *
+     * @param scriptPubkey  The script pubkey to verify
+     * @param amount        The amount in satoshis
+     * @param txTo          The transaction being verified
+     * @param spentOutputs  The outputs being spent
+     * @param inputIndex    The index of the input being verified
+     * @param flags         Verification flags
+     * @throws KernelTypes.KernelException If verification fails
+     */
+    public static void verify(
+            ScriptPubkey scriptPubkey,
+            long amount,
+            Transaction txTo,
+            TransactionOutput[] spentOutputs,
+            int inputIndex,
+            int flags) throws KernelTypes.KernelException {
 
-            } else {
-                    MemorySegment ptrArray = arena.allocate(ValueLayout.ADDRESS, spentOutputs.size());
-                    for (int i = 0; i < spentOutputs.size(); i++) {
-                        ptrArray.setAtIndex(ValueLayout.ADDRESS, i, spentOutputs.get(i).getInner());
-                    }
-                    spentOutputsPtr = ptrArray;
-            }
-
-            boolean success = kernel_verify_script(
-                    scriptPubkey.getInner(),
-                    kernelAmount,
-                    txTo.getInner(),
-                    spentOutputsPtr,
-                    spentOutputs.size(),
-                    inputIndex,
-                    kernelFlags,
-                    status
-            );
-
-            if (!success) {
-                int errorCode = status.get(ValueLayout.JAVA_INT, 0);
-                throw new KernelTypes.KernelException(KernelTypes.KernelException.ScriptVerifyError.fromNative(errorCode));
-            }
-        }
+        scriptPubkey.verify(amount, txTo, spentOutputs, inputIndex, flags);
     }
 
     @Override
-    public void close() {
-        kernel_chainstate_manager_destroy(chainstateManager, context.getInner());
-        context.close();
+    public void close() throws Exception {
+        if (chainstateManager != null) {
+            chainstateManager.close();
+        }
+        if (context != null) {
+            context.close();
+        }
     }
-
 }
-
-
-
-
-
-
-
-

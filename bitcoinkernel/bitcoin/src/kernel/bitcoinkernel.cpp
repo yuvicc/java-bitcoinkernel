@@ -84,7 +84,7 @@ public:
     void write(std::span<const std::byte> src)
     {
         if (m_writer(std::data(src), src.size(), m_user_data) != 0) {
-            throw std::runtime_error("Failed to write serilization data");
+            throw std::runtime_error("Failed to write serialization data");
         }
     }
 
@@ -230,30 +230,20 @@ struct LoggingConnection {
     void* m_user_data;
     std::function<void(void* user_data)> m_deleter;
 
-    LoggingConnection(btck_LogCallback callback, void* user_data, btck_DestroyCallback user_data_destroy_callback, const btck_LoggingOptions options)
+    LoggingConnection(btck_LogCallback callback, void* user_data, btck_DestroyCallback user_data_destroy_callback)
     {
         LOCK(cs_main);
 
-        LogInstance().m_log_timestamps = options.log_timestamps;
-        LogInstance().m_log_time_micros = options.log_time_micros;
-        LogInstance().m_log_threadnames = options.log_threadnames;
-        LogInstance().m_log_sourcelocations = options.log_sourcelocations;
-        LogInstance().m_always_print_category_level = options.always_print_category_levels;
-
         auto connection{LogInstance().PushBackCallback([callback, user_data](const std::string& str) { callback(user_data, str.c_str(), str.length()); })};
 
-        try {
-            // Only start logging if we just added the connection.
-            if (LogInstance().NumConnections() == 1 && !LogInstance().StartLogging()) {
-                LogError("Logger start failed.");
-                LogInstance().DeleteCallback(connection);
+        // Only start logging if we just added the connection.
+        if (LogInstance().NumConnections() == 1 && !LogInstance().StartLogging()) {
+            LogError("Logger start failed.");
+            LogInstance().DeleteCallback(connection);
+            if (user_data && user_data_destroy_callback) {
                 user_data_destroy_callback(user_data);
             }
-        } catch (std::exception& e) {
-            LogError("Logger start failed: %s", e.what());
-            LogInstance().DeleteCallback(connection);
-            user_data_destroy_callback(user_data);
-            throw;
+            throw std::runtime_error("Failed to start logging");
         }
 
         m_connection = std::make_unique<std::list<std::function<void(const std::string&)>>::iterator>(connection);
@@ -266,23 +256,24 @@ struct LoggingConnection {
     ~LoggingConnection()
     {
         LOCK(cs_main);
+        LogDebug(BCLog::KERNEL, "Logger disconnecting.");
 
-        LogDebug(BCLog::KERNEL, "Logger disconnected.");
-        LogInstance().DeleteCallback(*m_connection);
+        // Switch back to buffering by calling DisconnectTestLogger if the
+        // connection that we are about to remove is the last one.
+        if (LogInstance().NumConnections() == 1) {
+            LogInstance().DisconnectTestLogger();
+        } else {
+            LogInstance().DeleteCallback(*m_connection);
+        }
+
         m_connection.reset();
         if (m_user_data && m_deleter) {
             m_deleter(m_user_data);
         }
-
-        // Switch back to buffering by calling DisconnectTestLogger if the
-        // connection that was just removed was the last one.
-        if (!LogInstance().Enabled()) {
-            LogInstance().DisconnectTestLogger();
-        }
     }
 };
 
-class KernelNotifications : public kernel::Notifications
+class KernelNotifications final : public kernel::Notifications
 {
 private:
     btck_NotificationInterfaceCallbacks m_cbs;
@@ -354,7 +345,7 @@ protected:
     {
         if (m_cbs.block_checked) {
             m_cbs.block_checked(m_cbs.user_data,
-                                btck_Block::ref(new std::shared_ptr<const CBlock>{block}),
+                                btck_Block::copy(btck_Block::ref(&block)),
                                 btck_BlockValidationState::ref(&stateIn));
         }
     }
@@ -363,8 +354,8 @@ protected:
     {
         if (m_cbs.pow_valid_block) {
             m_cbs.pow_valid_block(m_cbs.user_data,
-                                  btck_BlockTreeEntry::ref(pindex),
-                                  btck_Block::ref(new std::shared_ptr<const CBlock>{block}));
+                                  btck_Block::copy(btck_Block::ref(&block)),
+                                  btck_BlockTreeEntry::ref(pindex));
         }
     }
 
@@ -372,7 +363,7 @@ protected:
     {
         if (m_cbs.block_connected) {
             m_cbs.block_connected(m_cbs.user_data,
-                                  btck_Block::ref(new std::shared_ptr<const CBlock>{block}),
+                                  btck_Block::copy(btck_Block::ref(&block)),
                                   btck_BlockTreeEntry::ref(pindex));
         }
     }
@@ -381,7 +372,7 @@ protected:
     {
         if (m_cbs.block_disconnected) {
             m_cbs.block_disconnected(m_cbs.user_data,
-                                     btck_Block::ref(new std::shared_ptr<const CBlock>{block}),
+                                     btck_Block::copy(btck_Block::ref(&block)),
                                      btck_BlockTreeEntry::ref(pindex));
         }
     }
@@ -411,8 +402,7 @@ public:
 
     Context(const ContextOptions* options, bool& sane)
         : m_context{std::make_unique<kernel::Context>()},
-          m_interrupt{std::make_unique<util::SignalInterrupt>()},
-          m_signals{std::make_unique<ValidationSignals>(std::make_unique<ImmediateTaskRunner>())}
+          m_interrupt{std::make_unique<util::SignalInterrupt>()}
     {
         if (options) {
             LOCK(options->m_mutex);
@@ -423,6 +413,7 @@ public:
                 m_notifications = options->m_notifications;
             }
             if (options->m_validation_interface) {
+                m_signals = std::make_unique<ValidationSignals>(std::make_unique<ImmediateTaskRunner>());
                 m_validation_interface = options->m_validation_interface;
                 m_signals->RegisterSharedValidationInterface(m_validation_interface);
             }
@@ -443,7 +434,9 @@ public:
 
     ~Context()
     {
-        m_signals->UnregisterSharedValidationInterface(m_validation_interface);
+        if (m_signals) {
+            m_signals->UnregisterSharedValidationInterface(m_validation_interface);
+        }
     }
 };
 
@@ -490,7 +483,7 @@ struct btck_ScriptPubkey : Handle<btck_ScriptPubkey, CScript> {};
 struct btck_LoggingConnection : Handle<btck_LoggingConnection, LoggingConnection> {};
 struct btck_ContextOptions : Handle<btck_ContextOptions, ContextOptions> {};
 struct btck_Context : Handle<btck_Context, std::shared_ptr<const Context>> {};
-struct btck_ChainParameters : Handle<btck_ChainParameters, std::unique_ptr<const CChainParams>> {};
+struct btck_ChainParameters : Handle<btck_ChainParameters, CChainParams> {};
 struct btck_ChainstateManagerOptions : Handle<btck_ChainstateManagerOptions, ChainstateManagerOptions> {};
 struct btck_ChainstateManager : Handle<btck_ChainstateManager, ChainMan> {};
 struct btck_Chain : Handle<btck_Chain, CChain> {};
@@ -504,6 +497,9 @@ struct btck_Txid: Handle<btck_Txid, Txid> {};
 
 btck_Transaction* btck_transaction_create(const void* raw_transaction, size_t raw_transaction_len)
 {
+    if (raw_transaction == nullptr && raw_transaction_len != 0) {
+        return nullptr;
+    }
     try {
         DataStream stream{std::span{reinterpret_cast<const std::byte*>(raw_transaction), raw_transaction_len}};
         return btck_Transaction::create(std::make_shared<const CTransaction>(deserialize, TX_WITH_WITNESS, stream));
@@ -563,6 +559,9 @@ void btck_transaction_destroy(btck_Transaction* transaction)
 
 btck_ScriptPubkey* btck_script_pubkey_create(const void* script_pubkey, size_t script_pubkey_len)
 {
+    if (script_pubkey == nullptr && script_pubkey_len != 0) {
+        return nullptr;
+    }
     auto data = std::span{reinterpret_cast<const uint8_t*>(script_pubkey), script_pubkey_len};
     return btck_ScriptPubkey::create(data.begin(), data.end());
 }
@@ -628,6 +627,8 @@ int btck_script_pubkey_verify(const btck_ScriptPubkey* script_pubkey,
         if (status) *status = btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED;
         return 0;
     }
+
+    if (status) *status = btck_ScriptVerifyStatus_OK;
 
     const CTransaction& tx{*btck_Transaction::get(tx_to)};
     std::vector<CTxOut> spent_outputs;
@@ -711,6 +712,16 @@ void btck_txid_destroy(btck_Txid* txid)
     delete txid;
 }
 
+void btck_logging_set_options(const btck_LoggingOptions options)
+{
+    LOCK(cs_main);
+    LogInstance().m_log_timestamps = options.log_timestamps;
+    LogInstance().m_log_time_micros = options.log_time_micros;
+    LogInstance().m_log_threadnames = options.log_threadnames;
+    LogInstance().m_log_sourcelocations = options.log_sourcelocations;
+    LogInstance().m_always_print_category_level = options.always_print_category_levels;
+}
+
 void btck_logging_set_level_category(btck_LogCategory category, btck_LogLevel level)
 {
     LOCK(cs_main);
@@ -736,12 +747,13 @@ void btck_logging_disable()
     LogInstance().DisableLogging();
 }
 
-btck_LoggingConnection* btck_logging_connection_create(btck_LogCallback callback,
-                                                       void* user_data,
-                                                       btck_DestroyCallback user_data_destroy_callback,
-                                                       const btck_LoggingOptions options)
+btck_LoggingConnection* btck_logging_connection_create(btck_LogCallback callback, void* user_data, btck_DestroyCallback user_data_destroy_callback)
 {
-    return btck_LoggingConnection::create(callback, user_data, user_data_destroy_callback, options);
+    try {
+        return btck_LoggingConnection::create(callback, user_data, user_data_destroy_callback);
+    } catch (const std::exception&) {
+        return nullptr;
+    }
 }
 
 void btck_logging_connection_destroy(btck_LoggingConnection* connection)
@@ -753,19 +765,19 @@ btck_ChainParameters* btck_chain_parameters_create(const btck_ChainType chain_ty
 {
     switch (chain_type) {
     case btck_ChainType_MAINNET: {
-        return btck_ChainParameters::create(CChainParams::Main());
+        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::Main().release()));
     }
     case btck_ChainType_TESTNET: {
-        return btck_ChainParameters::create(CChainParams::TestNet());
+        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::TestNet().release()));
     }
     case btck_ChainType_TESTNET_4: {
-        return btck_ChainParameters::create(CChainParams::TestNet4());
+        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::TestNet4().release()));
     }
     case btck_ChainType_SIGNET: {
-        return btck_ChainParameters::create(CChainParams::SigNet({}));
+        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::SigNet({}).release()));
     }
     case btck_ChainType_REGTEST: {
-        return btck_ChainParameters::create(CChainParams::RegTest({}));
+        return btck_ChainParameters::ref(const_cast<CChainParams*>(CChainParams::RegTest({}).release()));
     }
     }
     assert(false);
@@ -773,8 +785,7 @@ btck_ChainParameters* btck_chain_parameters_create(const btck_ChainType chain_ty
 
 btck_ChainParameters* btck_chain_parameters_copy(const btck_ChainParameters* chain_parameters)
 {
-    const auto& original = btck_ChainParameters::get(chain_parameters);
-    return btck_ChainParameters::create(std::make_unique<const CChainParams>(*original));
+    return btck_ChainParameters::copy(chain_parameters);
 }
 
 void btck_chain_parameters_destroy(btck_ChainParameters* chain_parameters)
@@ -791,7 +802,7 @@ void btck_context_options_set_chainparams(btck_ContextOptions* options, const bt
 {
     // Copy the chainparams, so the caller can free it again
     LOCK(btck_ContextOptions::get(options).m_mutex);
-    btck_ContextOptions::get(options).m_chainparams = std::make_unique<const CChainParams>(*btck_ChainParameters::get(chain_parameters));
+    btck_ContextOptions::get(options).m_chainparams = std::make_unique<const CChainParams>(btck_ChainParameters::get(chain_parameters));
 }
 
 void btck_context_options_set_notifications(btck_ContextOptions* options, btck_NotificationInterfaceCallbacks notifications)
@@ -1019,7 +1030,6 @@ int btck_chainstate_manager_import_blocks(btck_ChainstateManager* chainman, cons
             }
         }
         node::ImportBlocks(*btck_ChainstateManager::get(chainman).m_chainman, import_files);
-        btck_ChainstateManager::get(chainman).m_chainman->ActiveChainstate().ForceFlushStateToDisk();
     } catch (const std::exception& e) {
         LogError("Failed to import blocks: %s", e.what());
         return -1;
@@ -1029,6 +1039,9 @@ int btck_chainstate_manager_import_blocks(btck_ChainstateManager* chainman, cons
 
 btck_Block* btck_block_create(const void* raw_block, size_t raw_block_length)
 {
+    if (raw_block == nullptr && raw_block_length != 0) {
+        return nullptr;
+    }
     auto block{std::make_shared<CBlock>()};
 
     DataStream stream{std::span{reinterpret_cast<const std::byte*>(raw_block), raw_block_length}};
@@ -1095,12 +1108,9 @@ int32_t btck_block_tree_entry_get_height(const btck_BlockTreeEntry* entry)
     return btck_BlockTreeEntry::get(entry).nHeight;
 }
 
-btck_BlockHash* btck_block_tree_entry_get_block_hash(const btck_BlockTreeEntry* entry)
+const btck_BlockHash* btck_block_tree_entry_get_block_hash(const btck_BlockTreeEntry* entry)
 {
-    if (btck_BlockTreeEntry::get(entry).phashBlock == nullptr) {
-        return nullptr;
-    }
-    return btck_BlockHash::create(btck_BlockTreeEntry::get(entry).GetBlockHash());
+    return btck_BlockHash::ref(btck_BlockTreeEntry::get(entry).phashBlock);
 }
 
 btck_BlockHash* btck_block_hash_create(const unsigned char block_hash[32])
@@ -1229,19 +1239,10 @@ const btck_Chain* btck_chainstate_manager_get_active_chain(const btck_Chainstate
     return btck_Chain::ref(&WITH_LOCK(btck_ChainstateManager::get(chainman).m_chainman->GetMutex(), return btck_ChainstateManager::get(chainman).m_chainman->ActiveChain()));
 }
 
-const btck_BlockTreeEntry* btck_chain_get_tip(const btck_Chain* chain)
-{
-    return btck_BlockTreeEntry::ref(btck_Chain::get(chain).Tip());
-}
-
 int btck_chain_get_height(const btck_Chain* chain)
 {
+    LOCK(::cs_main);
     return btck_Chain::get(chain).Height();
-}
-
-const btck_BlockTreeEntry* btck_chain_get_genesis(const btck_Chain* chain)
-{
-    return btck_BlockTreeEntry::ref(btck_Chain::get(chain).Genesis());
 }
 
 const btck_BlockTreeEntry* btck_chain_get_by_height(const btck_Chain* chain, int height)

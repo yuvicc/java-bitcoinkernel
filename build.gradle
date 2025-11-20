@@ -1,7 +1,6 @@
 plugins {
     id 'java'
-    id "io.github.krakowski.jextract" version "0.5.0"
-    id "application"
+    id 'application'
 }
 
 repositories {
@@ -43,32 +42,11 @@ tasks.register('compileBitcoinCore', Exec) {
 }
 compileBitcoinCore.dependsOn(buildBitcoinCore)
 
-// Configure jextract to generate Java bindings
-jextract {
-    header(bitcoinKernelHeader.absolutePath) {
-        // Point to the compiled library - adjust extension based on your OS
-        libraries = [
-                ":${bitcoinBuildDir}/lib/libbitcoinkernel.so"       // change this with respect to your operating system(see readme)
-        ]
-        targetPackage = 'org.bitcoinkernel'
-        className = 'BitcoinKernelBindings'
-
-        // Include directories for dependencies
-        includes = [
-                "${bitcoinCoreDir}/src",
-                "${bitcoinCoreDir}/src/kernel",
-                "${bitcoinBuildDir}/src/kernel"  // For generated headers
-        ]
-    }
-}
-
 // Configure source sets
 sourceSets {
     main {
         java {
             srcDirs = ['src/main/java']
-            // Add jextract generated sources
-            srcDir "${buildDir}/generated/sources/jextract"
         }
     }
 }
@@ -81,12 +59,4 @@ application {
 }
 
 // Ensure proper build order
-jextract.dependsOn compileBitcoinCore
-compileJava.dependsOn jextract
-
-// Java toolchain configuration
-//java {
-//    toolchain {
-//        languageVersion = JavaLanguageVersion.of(22)
-//    }
-//}
+compileJava.dependsOn compileBitcoinCore

@@ -2,176 +2,120 @@ package org.bitcoinkernel;
 
 import java.lang.foreign.MemorySegment;
 
-import static org.bitcoinkernel.BitcoinKernelBindings.*;
+import static org.bitcoinkernel.jextract.bitcoinkernel_h.*;
 
 // Enum definitions and conversions for Bitcoin Kernel
 public class KernelTypes {
 
-    // Synchronization state enum - similar to rust-bitcoinkernel
-    public enum SynchronizationState {
-        INIT_REINDEX(kernel_INIT_REINDEX()),
-        INIT_DOWNLOAD(kernel_INIT_DOWNLOAD()),
-        POST_INIT(kernel_POST_INIT());
+    // ===== Log Category =====
+    public enum LogCategory {
+        ALL(btck_LogCategory_ALL()),
+        BENCH(btck_LogCategory_BENCH()),
+        BLOCKSTORAGE(btck_LogCategory_BLOCKSTORAGE()),
+        COINDB(btck_LogCategory_COINDB()),
+        LEVELDB(btck_LogCategory_LEVELDB()),
+        MEMPOOL(btck_LogCategory_MEMPOOL()),
+        PRUNE(btck_LogCategory_PRUNE()),
+        RAND(btck_LogCategory_RAND()),
+        REINDEX(btck_LogCategory_REINDEX()),
+        VALIDATION(btck_LogCategory_VALIDATION()),
+        KERNEL(btck_LogCategory_KERNEL());
 
-        private final int nativeValue;
+        private final byte value;
 
-        SynchronizationState(int nativeValue){
-            this.nativeValue = nativeValue;
+        LogCategory(byte value) {
+            this.value = value;
         }
 
-        public int getNativeValue(){
-            return nativeValue;
+        public byte getValue() {
+            return value;
         }
 
-        public static SynchronizationState fromNative(int state) {
-            for (SynchronizationState value: values()) {
-                if (value.nativeValue == state) {
-                    return value;
+        public static LogCategory fromByte(byte value) {
+            for (LogCategory category : values()) {
+                if (category.value == value) {
+                    return category;
                 }
             }
-            throw new IllegalArgumentException("Unknown synchronization state: " + state);
+            throw new IllegalArgumentException("Invalid LogCategory: " + value);
         }
     }
 
-    // Warning State enum
-    public enum KernelWarning {
-        UNKNOWN_NEW_RULES_ACTIVATED(kernel_UNKNOWN_NEW_RULES_ACTIVATED()),
-        LARGE_WORK_INVALID_CHAIN(kernel_LARGE_WORK_INVALID_CHAIN());
+    // ===== Log Level =====
+    public enum LogLevel {
+        TRACE(btck_LogLevel_TRACE()),
+        DEBUG(btck_LogLevel_DEBUG()),
+        INFO(btck_LogLevel_INFO());
 
-        private final int nativeValue;
+        private final byte value;
 
-        KernelWarning(int nativeValue) {
-            this.nativeValue = nativeValue;
+        LogLevel(byte value) {
+            this.value = value;
         }
 
-        public int getNativeValue() {
-            return nativeValue;
+        public byte getValue() {
+            return value;
         }
 
-        public static KernelWarning fromNative(int warning) {
-            for (KernelWarning value: values()) {
-                if (value.nativeValue == warning){
-                    return value;
+        public static LogLevel fromByte(byte value) {
+            for (LogLevel level : values()) {
+                if (level.value == value) {
+                    return level;
                 }
             }
-            throw new IllegalArgumentException("Unknown Warning Value: " + warning);
+            throw new IllegalArgumentException("Invalid LogLevel: " + value);
         }
     }
 
-    public enum ChainType {
-        MAINNET(kernel_CHAIN_TYPE_MAINNET()),
-        SIGNET(kernel_CHAIN_TYPE_SIGNET()),
-        REGTEST(kernel_CHAIN_TYPE_REGTEST()),
-        TESTNET(kernel_CHAIN_TYPE_TESTNET()),
-        TESTNET_4(kernel_CHAIN_TYPE_TESTNET_4());
+    // ===== Script Verify Status =====
+    public enum ScriptVerifyStatus {
+        OK(btck_ScriptVerifyStatus_OK()),
+        ERROR_INVALID_FLAGS_COMBINATION(btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION()),
+        ERROR_SPENT_OUTPUTS_REQUIRED(btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED());
 
-        private final int nativeValue;
+        private final byte value;
 
-        ChainType(int nativeValue) {
-            this.nativeValue = nativeValue;
+        ScriptVerifyStatus(byte value) {
+            this.value = value;
         }
 
-        public int toNative() {
-            return nativeValue;
+        public byte getValue() {
+            return value;
         }
 
-        public static ChainType fromNative(int chainType) {
-            for (ChainType value: values()) {
-                if (value.nativeValue == chainType) {
-                    return value;
+        public static ScriptVerifyStatus fromByte(byte value) {
+            for (ScriptVerifyStatus status : values()) {
+                if (status.value == value) {
+                    return status;
                 }
             }
-            throw new IllegalArgumentException("Unknown Chainstate Type: " + chainType);
+            throw new IllegalArgumentException("Invalid ScriptVerifyStatus: " + value);
         }
     }
 
-    // Validation mode enum
-    public enum ValidationMode {
-        VALID(kernel_VALIDATION_STATE_VALID()),
-        INVALID(kernel_VALIDATION_STATE_INVALID()),
-        ERROR(kernel_VALIDATION_STATE_ERROR());
+    // ===== Script Verification Flags =====
+    public static class ScriptVerificationFlags {
+        public static final int SCRIPT_VERIFY_NONE = btck_ScriptVerificationFlags_NONE();
+        public static final int SCRIPT_VERIFY_P2SH = btck_ScriptVerificationFlags_P2SH();
+        public static final int SCRIPT_VERIFY_DERSIG = btck_ScriptVerificationFlags_DERSIG();
+        public static final int SCRIPT_VERIFY_NULLDUMMY = btck_ScriptVerificationFlags_NULLDUMMY();
+        public static final int SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY = btck_ScriptVerificationFlags_CHECKLOCKTIMEVERIFY();
+        public static final int SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = btck_ScriptVerificationFlags_CHECKSEQUENCEVERIFY();
+        public static final int SCRIPT_VERIFY_WITNESS = btck_ScriptVerificationFlags_WITNESS();
+        public static final int SCRIPT_VERIFY_TAPROOT = btck_ScriptVerificationFlags_TAPROOT();
+        public static final int SCRIPT_VERIFY_ALL = btck_ScriptVerificationFlags_ALL();
 
-        private final int nativeValue;
-
-        ValidationMode(int nativeValue) {
-            this.nativeValue = nativeValue;
-        }
-
-        public int getNativeValue() {
-            return nativeValue;
-        }
-
-        public static ValidationMode fromNative(int mode) {
-            for (ValidationMode value: values()) {
-                if (value.nativeValue == mode) {
-                    return value;
-                }
-            }
-            return ERROR;
+        private ScriptVerificationFlags() {
+            // Utility class, prevent instantiation
         }
     }
 
-    // Block Validation result enums
-    public enum BlockValidationResult {
-        RESULT_UNSET(kernel_BLOCK_RESULT_UNSET()),
-        CONSENSUS(kernel_BLOCK_CONSENSUS()),
-        CACHED_INVALID(kernel_BLOCK_CACHED_INVALID()),
-        INVALID_HEADER(kernel_BLOCK_INVALID_HEADER()),
-        MUTATED(kernel_BLOCK_MUTATED()),
-        MISSING_PREV(kernel_BLOCK_MISSING_PREV()),
-        INVALID_PREV(kernel_BLOCK_INVALID_PREV()),
-        TIME_FUTURE(kernel_BLOCK_TIME_FUTURE()),
-        HEADER_LOW_WORK(kernel_BLOCK_HEADER_LOW_WORK());
-
-        private final int nativeValue;
-
-        BlockValidationResult(int nativeValue) {
-            this.nativeValue = nativeValue;
-        }
-
-        public int getNativeValue() {
-            return nativeValue;
-        }
-
-        public static BlockValidationResult fromNative(int result) {
-            for (BlockValidationResult value: values()) {
-                if (value.nativeValue == result) {
-                    return value;
-                }
-            }
-            return CONSENSUS;
-        }
-    }
-
-    // Block Validation state
-    public static class BlockValidationState {
-        private final MemorySegment inner;
-
-        public BlockValidationState(MemorySegment inner) {
-            this.inner = inner;
-        }
-
-        public MemorySegment getInner() {
-            return inner;
-        }
-
-        public ValidationMode getMode() {
-            return ValidationMode.fromNative(kernel_get_validation_mode_from_block_validation_state(inner));
-        }
-
-        public BlockValidationResult getResult() {
-            return BlockValidationResult.fromNative(kernel_get_block_validation_result_from_block_validation_state(inner));
-        }
-    }
-
-    // Kernel Exception
+    // ===== Kernel Exception =====
     public static class KernelException extends Exception {
         public enum ScriptVerifyError {
-            TX_INPUT_INDEX(kernel_SCRIPT_VERIFY_ERROR_TX_INPUT_INDEX()),
-            INVALID_FLAGS(kernel_SCRIPT_VERIFY_ERROR_INVALID_FLAGS()),
-            INVALD_FLAGS_COMBINATION(kernel_SCRIPT_VERIFY_ERROR_INVALID_FLAGS_COMBINATION()),
-            SPENT_OUTPUTS_REQUIRED(kernel_SCRIPT_VERIFY_ERROR_SPENT_OUTPUTS_REQUIRED()),
-            SPENT_OUTPUTS_MISMATCH(kernel_SCRIPT_VERIFY_ERROR_SPENT_OUTPUTS_MISMATCH()),
+            OK(btck_ScriptVerifyStatus_OK()),
+            INVALID_FLAGS_COMBINATION(btck_ScriptVerifyStatus_ERROR_INVALID_FLAGS_COMBINATION()),
+            SPENT_OUTPUTS_REQUIRED(btck_ScriptVerifyStatus_ERROR_SPENT_OUTPUTS_REQUIRED()),
             INVALID(0);
 
             private final int nativeValue;
