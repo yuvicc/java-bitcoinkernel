@@ -269,7 +269,7 @@ public class Chainstate {
             return new BlockSpentOutputs(undoPtr);
         }
 
-        private void checkClosed() {
+        void checkClosed() {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("ChainstateManager has been closed");
             }

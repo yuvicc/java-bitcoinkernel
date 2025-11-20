@@ -7,6 +7,7 @@ import java.lang.invoke.MethodType;
 
 import static org.bitcoinkernel.jextract.bitcoinkernel_h.*;
 import static org.bitcoinkernel.Chainstate.*;
+import static org.bitcoinkernel.NotificationsManager.*;
 
 public class ContextManager {
 
@@ -26,11 +27,15 @@ public class ContextManager {
             btck_context_options_set_chainparams(inner, chainParams.getInner());
         }
 
-        // todo!
-        public void setNotifications(){}
+        public void setNotifications(NotificationsManager.KernelNotificationManager notificationManager) {
+            checkClosed();
+            btck_context_options_set_notifications(inner, notificationManager.getCallbackStruct());
+        }
 
-        //todo!
-        public void setValidationInterface(){}
+        public void setValidationInterface(NotificationsManager.ValidationInterfaceManager validationManager) {
+            checkClosed();
+            btck_context_options_set_validation_interface(inner, validationManager.getCallbackStruct());
+        }
 
         MemorySegment getInner() {
             return inner;

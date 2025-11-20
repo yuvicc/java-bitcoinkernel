@@ -5,15 +5,17 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import static org.bitcoinkernel.jextract.bitcoinkernel_h.*;
+import static org.bitcoinkernel.KernelData.*;
 
 public class Transactions {
+
     // ===== Transaction =====
     public static class Transaction {
         private final MemorySegment inner;
 
         Transaction(MemorySegment inner) {
             if (inner == MemorySegment.NULL) {
-                throw new IllegalStateException("Transaction Object cannot be null")
+                throw new IllegalStateException("Transaction Object cannot be null");
             }
             this.inner = inner;
         }
@@ -45,6 +47,12 @@ public class Transactions {
         public Txid getTxid() {
             MemorySegment txidPtr = btck_transaction_get_txid(inner);
             return new Txid(txidPtr);
+        }
+
+        void checkClosed() {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalStateException("Transaction has been closed");
+            }
         }
 
         MemorySegment getInner() {
@@ -212,22 +220,6 @@ public class Transactions {
                 result = 31 * result + b;
             }
             return result;
-        }
-
-        MemorySegment getInner() {
-            return inner;
-        }
-    }
-
-    // ===== Script Pubkey =====
-    public static class ScriptPubkey {
-        private final MemorySegment inner;
-
-        ScriptPubkey(MemorySegment inner) {
-            if (inner == MemorySegment.NULL) {
-                throw new IllegalArgumentException("ScriptPubKey cannot be null");
-            }
-            this.inner = inner;
         }
 
         MemorySegment getInner() {
