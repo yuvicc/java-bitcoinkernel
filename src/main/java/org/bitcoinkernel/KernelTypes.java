@@ -7,7 +7,6 @@ import static org.bitcoinkernel.BitcoinKernelBindings.*;
 // Enum definitions and conversions for Bitcoin Kernel
 public class KernelTypes {
 
-    // Synchronization state enum - similar to rust-bitcoinkernel
     public enum SynchronizationState {
         INIT_REINDEX(kernel_INIT_REINDEX()),
         INIT_DOWNLOAD(kernel_INIT_DOWNLOAD()),

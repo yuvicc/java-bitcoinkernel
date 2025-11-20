@@ -219,7 +219,7 @@ public class Blocks {
             return inner;
         }
 
-        private void checkClosed() {
+        public void checkClosed() {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("Block Hash has been closed");
             }
@@ -318,7 +318,7 @@ public class Blocks {
             return inner;
         }
 
-        private void checkClosed() {
+        public void checkClosed() {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("Block has been closed");
             }
