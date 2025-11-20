@@ -5,7 +5,7 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
-import static org.bitcoinkernel.BitcoinKernelBindings.*;
+import static org.bitcoinkernel.jextract.bitcoinkernel_h.*;
 import static org.bitcoinkernel.Chainstate.*;
 
 public class ContextManager {
@@ -25,6 +25,12 @@ public class ContextManager {
             checkClosed();
             btck_context_options_set_chainparams(inner, chainParams.getInner());
         }
+
+        // todo!
+        public void setNotifications(){}
+
+        //todo!
+        public void setValidationInterface(){}
 
         MemorySegment getInner() {
             return inner;
