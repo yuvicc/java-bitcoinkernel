@@ -10,14 +10,38 @@ import static org.bitcoinkernel.KernelData.*;
 public class Transactions {
 
     // ===== Transaction =====
-    public static class Transaction {
-        private final MemorySegment inner;
+    public static class Transaction implements AutoCloseable {
+        private MemorySegment inner;
+        private final Arena arena;
 
         Transaction(MemorySegment inner) {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("Transaction Object cannot be null");
             }
             this.inner = inner;
+            this.arena = null;
+        }
+
+        public Transaction(byte[] rawTransaction) throws IllegalArgumentException {
+            if (rawTransaction == null || rawTransaction.length == 0) {
+                throw new IllegalArgumentException("Raw transaction cannot be null or empty");
+            }
+            this.arena = Arena.ofConfined();
+            MemorySegment txSegment = arena.allocateFrom(ValueLayout.JAVA_BYTE, rawTransaction);
+            this.inner = btck_transaction_create(txSegment, rawTransaction.length);
+            if (this.inner == MemorySegment.NULL) {
+                arena.close();
+                throw new IllegalArgumentException("Failed to create Transaction from raw data");
+            }
+        }
+
+        public Transaction copy() {
+            checkClosed();
+            MemorySegment copied = btck_transaction_copy(inner);
+            if (copied == MemorySegment.NULL) {
+                throw new RuntimeException("Failed to copy Transaction");
+            }
+            return new Transaction(copied);
         }
 
         public long countInputs() {
@@ -58,72 +82,193 @@ public class Transactions {
         MemorySegment getInner() {
             return inner;
         }
+
+        @Override
+        public void close() throws Exception {
+            if (inner != MemorySegment.NULL) {
+                btck_transaction_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
+            if (arena != null) {
+                arena.close();
+            }
+        }
     }
 
     // ===== Transaction Input =====
-    public static class TransactionInput {
-        private final MemorySegment inner;
+    public static class TransactionInput implements AutoCloseable {
+        private MemorySegment inner;
+        private final boolean ownsMemory;
 
         TransactionInput(MemorySegment inner) {
             if (inner == MemorySegment.NULL) {
-                throw new IllegalStateException("Transasction Input object cannot be null");
+                throw new IllegalStateException("Transaction Input object cannot be null");
             }
             this.inner = inner;
+            this.ownsMemory = false;
+        }
+
+        private TransactionInput(MemorySegment inner, boolean ownsMemory) {
+            this.inner = inner;
+            this.ownsMemory = ownsMemory;
+        }
+
+        public TransactionInput copy() {
+            checkClosed();
+            MemorySegment copied = btck_transaction_input_copy(inner);
+            if (copied == MemorySegment.NULL) {
+                throw new RuntimeException("Failed to copy TransactionInput");
+            }
+            return new TransactionInput(copied, true);
         }
 
         public TransactionOutPoint getOutPoint() {
+            checkClosed();
             MemorySegment outPointPtr = btck_transaction_input_get_out_point(inner);
             return new TransactionOutPoint(outPointPtr);
+        }
+
+        private void checkClosed() {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalStateException("TransactionInput has been closed");
+            }
         }
 
         MemorySegment getInner() {
             return inner;
         }
+
+        @Override
+        public void close() throws Exception {
+            if (inner != MemorySegment.NULL && ownsMemory) {
+                btck_transaction_input_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
+        }
     }
 
     // ===== Transaction OutPoint =====
-    public static class TransactionOutPoint {
-        private final MemorySegment inner;
+    public static class TransactionOutPoint implements AutoCloseable {
+        private MemorySegment inner;
+        private final boolean ownsMemory;
 
         TransactionOutPoint(MemorySegment inner) {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalArgumentException("TransactionOutPoint cannot be null");
             }
             this.inner = inner;
+            this.ownsMemory = false;
+        }
+
+        private TransactionOutPoint(MemorySegment inner, boolean ownsMemory) {
+            this.inner = inner;
+            this.ownsMemory = ownsMemory;
+        }
+
+        public TransactionOutPoint copy() {
+            checkClosed();
+            MemorySegment copied = btck_transaction_out_point_copy(inner);
+            if (copied == MemorySegment.NULL) {
+                throw new RuntimeException("Failed to copy TransactionOutPoint");
+            }
+            return new TransactionOutPoint(copied, true);
         }
 
         public long getIndex() {
+            checkClosed();
             return Integer.toUnsignedLong(btck_transaction_out_point_get_index(inner));
         }
 
         public Txid getTxid() {
-            MemorySegment txidPtr = btck_transaction_get_txid(inner);
+            checkClosed();
+            MemorySegment txidPtr = btck_transaction_out_point_get_txid(inner);
             return new Txid(txidPtr);
+        }
+
+        private void checkClosed() {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalStateException("TransactionOutPoint has been closed");
+            }
+        }
+
+        MemorySegment getInner() {
+            return inner;
+        }
+
+        @Override
+        public void close() throws Exception {
+            if (inner != MemorySegment.NULL && ownsMemory) {
+                btck_transaction_out_point_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
         }
     }
 
     // ===== Transaction Output =====
-    public static class TransactionOutput {
-        private final MemorySegment inner;
+    public static class TransactionOutput implements AutoCloseable {
+        private MemorySegment inner;
+        private final boolean ownsMemory;
 
         TransactionOutput(MemorySegment inner) {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalArgumentException("TransactionOutput cannot be null");
             }
             this.inner = inner;
+            this.ownsMemory = false;
+        }
+
+        private TransactionOutput(MemorySegment inner, boolean ownsMemory) {
+            this.inner = inner;
+            this.ownsMemory = ownsMemory;
+        }
+
+        public TransactionOutput(ScriptPubkey scriptPubkey, long amount) {
+            if (scriptPubkey == null) {
+                throw new IllegalArgumentException("ScriptPubkey cannot be null");
+            }
+            this.inner = btck_transaction_output_create(scriptPubkey.getInner(), amount);
+            if (this.inner == MemorySegment.NULL) {
+                throw new IllegalArgumentException("Failed to create TransactionOutput");
+            }
+            this.ownsMemory = true;
+        }
+
+        public TransactionOutput copy() {
+            checkClosed();
+            MemorySegment copied = btck_transaction_output_copy(inner);
+            if (copied == MemorySegment.NULL) {
+                throw new RuntimeException("Failed to copy TransactionOutput");
+            }
+            return new TransactionOutput(copied, true);
         }
 
         public long getAmount() {
+            checkClosed();
             return btck_transaction_output_get_amount(inner);
         }
 
         public ScriptPubkey getScriptPubKey() {
+            checkClosed();
             MemorySegment scriptPtr = btck_transaction_output_get_script_pubkey(inner);
             return new ScriptPubkey(scriptPtr);
         }
 
+        private void checkClosed() {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalStateException("TransactionOutput has been closed");
+            }
+        }
+
         MemorySegment getInner() {
             return inner;
+        }
+
+        @Override
+        public void close() throws Exception {
+            if (inner != MemorySegment.NULL && ownsMemory) {
+                btck_transaction_output_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
         }
     }
 
@@ -190,17 +335,34 @@ public class Transactions {
     }
 
     // ===== Txid =====
-    public static class Txid {
-        private final MemorySegment inner;
+    public static class Txid implements AutoCloseable {
+        private MemorySegment inner;
+        private final boolean ownsMemory;
 
         Txid(MemorySegment inner) {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalArgumentException("Txid cannot be null");
             }
             this.inner = inner;
+            this.ownsMemory = false;
+        }
+
+        private Txid(MemorySegment inner, boolean ownsMemory) {
+            this.inner = inner;
+            this.ownsMemory = ownsMemory;
+        }
+
+        public Txid copy() {
+            checkClosed();
+            MemorySegment copied = btck_txid_copy(inner);
+            if (copied == MemorySegment.NULL) {
+                throw new RuntimeException("Failed to copy Txid");
+            }
+            return new Txid(copied, true);
         }
 
         public byte[] toBytes() {
+            checkClosed();
             try (var arena = Arena.ofConfined()) {
                 MemorySegment output = arena.allocate(32);
                 btck_txid_to_bytes(inner, output);
@@ -209,6 +371,11 @@ public class Transactions {
         }
 
         public boolean equals(Txid other) {
+            checkClosed();
+            if (other == null) {
+                return false;
+            }
+            other.checkClosed();
             return btck_txid_equals(inner, other.getInner()) != 0;
         }
 
@@ -222,8 +389,22 @@ public class Transactions {
             return result;
         }
 
+        private void checkClosed() {
+            if (inner == MemorySegment.NULL) {
+                throw new IllegalStateException("Txid has been closed");
+            }
+        }
+
         MemorySegment getInner() {
             return inner;
+        }
+
+        @Override
+        public void close() throws Exception {
+            if (inner != MemorySegment.NULL && ownsMemory) {
+                btck_txid_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
         }
     }
 
