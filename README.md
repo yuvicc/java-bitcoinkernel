@@ -23,8 +23,8 @@ This library is **alpha** - under active development. APIs may change and functi
 ## Requirements
 
 - **JDK 25+** (for FFM API support)
-- **CMake 3.16+**
-- **C++20 compiler** (GCC 11+ or Clang 14+)
+- **CMake 3.16+** fore Bitcoin Core compiling
+- **C++20** for Bitcoin Core compiling
 - **Boost libraries** - see Bitcoin Core [build documentation](https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md)
 
 ## Quick Start
@@ -45,6 +45,24 @@ cd java-bitcoinkernel
 ```bash
 ./gradlew test
 ```
+
+### Interactive Testing with JShell
+
+Launch an interactive JShell session to explore the API:
+
+```bash
+./examples/jshell-run.sh
+```
+
+Then try:
+```java
+var kernel = createTempKernel();
+var chainman = kernel.getChainstateManager();
+var blocks = loadBlockData("tests/block_data.txt");
+// ... explore the API interactively
+```
+
+See [examples/README.md](examples/README.md) for detailed JShell usage and more examples.
 
 ### Usage Example
 
@@ -105,14 +123,14 @@ try (ScriptPubkey scriptPubkey = new ScriptPubkey(scriptPubkeyBytes);
 
     BitcoinKernel.verify(
         scriptPubkey,
-        amount,                    // Amount in satoshis
-        tx,                        // Transaction being verified
-        spentOutputs,              // Array of outputs being spent
-        inputIndex,                // Input index to verify
-        flags                      // Verification flags
+        amount,
+        tx,
+        spentOutputs,
+        inputIndex,
+        flags
     );
 
-    System.out.println("Transaction verified successfully!");
+    System.out.println("Transaction verified successfully");
 }
 ```
 
@@ -121,7 +139,6 @@ try (ScriptPubkey scriptPubkey = new ScriptPubkey(scriptPubkeyBytes);
 The wrapper follows Java's `AutoCloseable` pattern:
 - Objects created from byte arrays **own** their native memory
 - Objects obtained as views (e.g., `Block.getTransaction()`) **do not own** memory
-- Always use try-with-resources to ensure proper cleanup
 
 ## Development
 
@@ -150,9 +167,9 @@ cd ../..
 ## Platform Support
 
 Currently tested on:
-- ✅ Linux (Ubuntu 22.04+)
-- ✅ macOS (12.0+)
-- ⚠️ Windows (not tested yet)
+- Linux (Ubuntu 22.04+)
+- macOS (12.0+)
+- Windows (not tested yet)
 
 ## References
 
