@@ -53,13 +53,17 @@ jobs:
         run: |
           brew install cmake boost
 
+      - name: Get Bitcoin submodule commit
+        id: bitcoin-submodule
+        run: echo "sha=$(git submodule status bitcoinkernel/bitcoin | awk '{print $1}')" >> $GITHUB_OUTPUT
+
       - name: Cache Bitcoin Kernel build
         uses: actions/cache@v4
         with:
           path: |
             bitcoinkernel/bitcoin/build
             /usr/local/lib/libbitcoinkernel.*
-          key: ${{ runner.os }}-bitcoinkernel-${{ hashFiles('bitcoinkernel/bitcoin/**') }}
+          key: ${{ runner.os }}-bitcoinkernel-${{ steps.bitcoin-submodule.outputs.sha }}
           restore-keys: |
             ${{ runner.os }}-bitcoinkernel-
 

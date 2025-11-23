@@ -4,9 +4,6 @@ plugins {
 }
 
 dependencies {
-    // JSON processing
-    implementation 'com.google.code.gson:gson:2.10.1'
-
     // Testing
     testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
@@ -98,52 +95,3 @@ test {
         exceptionFormat "full"
     }
 }
-
-// Task to run conformance handler
-tasks.register('conformanceHandler', Exec) {
-    group = 'conformance'
-    description = 'Run the conformance test handler (reads from stdin, writes to stdout)'
-
-    classpath = sourceSets.main.runtimeClasspath
-    mainClass = 'org.bitcoinkernel.conformance.ConformanceTestHandler'
-
-    // Required for FFM
-    jvmArgs = ['--enable-native-access=ALL-UNNAMED']
-
-    // Connect stdin/stdout
-    standardInput = System.in
-    standardOutput = System.out
-    standardError = System.err
-}
-
-// Build uber JAR with all dependencies
-tasks.register('buildConformanceJar', Jar) {
-    group = 'conformance'
-    description = 'Build standalone conformance handler JAR with all dependencies'
-
-    archiveBaseName = 'java-bitcoinkernel-conformance-handler'
-    archiveVersion = '0.1.0'
-
-    from sourceSets.main.output
-
-    // Include all dependencies
-    from {
-        configurations.runtimeClasspath.collect {
-            it.isDirectory() ? it : zipTree(it)
-        }
-    }
-
-    // Avoid duplicate files
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    manifest {
-        attributes(
-                'Main-Class': 'org.bitcoinkernel.conformance.ConformanceTestHandler',
-                'Implementation-Title': 'Java Bitcoin Kernel Conformance Handler',
-                'Implementation-Version': archiveVersion.get()
-        )
-    }
-}
-
-// Make conformance JAR depend on compilation
-buildConformanceJar.dependsOn compileJava
