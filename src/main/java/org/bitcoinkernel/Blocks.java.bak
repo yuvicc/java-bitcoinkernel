@@ -79,7 +79,7 @@ public class Blocks {
         }
 
         BlockValidationState(MemorySegment inner) {
-            if (isNull(inner)) {
+            if (inner == MemorySegment.NULL) {
                 throw new IllegalArgumentException("Block Validation State cannot be null");
             }
             this.inner = inner;
@@ -145,7 +145,7 @@ public class Blocks {
             this.arena = Arena.ofConfined();
             MemorySegment hashSegment = arena.allocateFrom(ValueLayout.JAVA_BYTE, hash);
             this.inner = btck_block_hash_create(hashSegment);
-            if (isNull(inner)) {
+            if (inner == MemorySegment.NULL) {
                 throw new KernelTypes.KernelException("Failed to instantiate Block Hash object");
             }
             this.ownsMemory = true;
@@ -176,7 +176,7 @@ public class Blocks {
         public BlockHash copy() {
             checkClosed();
             MemorySegment copied = btck_block_hash_copy(inner);
-            if (isNull(copied)) {
+            if (copied == MemorySegment.NULL) {
                 throw new RuntimeException("Failed to copy BlockHash");
             }
             return new BlockHash(copied, true);
@@ -197,7 +197,7 @@ public class Blocks {
         }
 
         public void checkClosed() {
-            if (isNull(inner)) {
+            if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("Block Hash has been closed");
             }
         }
@@ -220,7 +220,7 @@ public class Blocks {
         private final MemorySegment inner;
 
         BlockTreeEntry(MemorySegment inner) {
-            if (isNull(inner)) {
+            if (inner == MemorySegment.NULL) {
                 throw new IllegalArgumentException("Block Tree cannot be null!");
             }
             this.inner = inner;
@@ -228,7 +228,7 @@ public class Blocks {
 
         public BlockTreeEntry getPrevious() {
             MemorySegment prev = btck_block_tree_entry_get_previous(inner);
-            if (isNull(prev)) {
+            if (prev == MemorySegment.NULL) {
                 return null;
             }
             return new BlockTreeEntry(prev);
@@ -288,34 +288,7 @@ public class Blocks {
 
         public byte[] toBytes() {
             checkClosed();
-
-            // Use a ByteArrayOutputStream-like approach via Arena
-            try (var arena = Arena.ofConfined()) {
-                // Create a container to collect bytes
-                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
-
-                // Create the writer callback
-                org.bitcoinkernel.jextract.btck_WriteBytes.Function writer = (bytes, size, userData) -> {
-                    try {
-                        byte[] data = bytes.reinterpret(size).toArray(ValueLayout.JAVA_BYTE);
-                        baos.write(data);
-                        return 0; // success
-                    } catch (Exception e) {
-                        return 1; // error
-                    }
-                };
-
-                MemorySegment writerSegment = org.bitcoinkernel.jextract.btck_WriteBytes.allocate(writer, arena);
-
-                int result = btck_block_to_bytes(inner, writerSegment, MemorySegment.NULL);
-                if (result != 0) {
-                    throw new RuntimeException("Failed to serialize block");
-                }
-
-                return baos.toByteArray();
-            } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize block", e);
-            }
+            throw new UnsupportedOperationException("Block serialization not yet implemented");
         }
 
         MemorySegment getInner() {
@@ -323,7 +296,7 @@ public class Blocks {
         }
 
         public void checkClosed() {
-            if (isNull(inner)) {
+            if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("Block has been closed");
             }
         }
@@ -346,7 +319,7 @@ public class Blocks {
         private final boolean ownsMemory;
 
         BlockSpentOutputs(MemorySegment inner) {
-            if (isNull(inner)) {
+            if (inner == MemorySegment.NULL) {
                 throw new IllegalArgumentException("BlockSpentOutputs cannot be null");
             }
             this.inner = inner;
@@ -375,7 +348,7 @@ public class Blocks {
         public BlockSpentOutputs copy() {
             checkClosed();
             MemorySegment copied = btck_block_spent_outputs_copy(inner);
-            if (isNull(copied)) {
+            if (copied == MemorySegment.NULL) {
                 throw new RuntimeException("Failed to copy block spent outputs");
             }
             return new BlockSpentOutputs(copied, true);
@@ -407,7 +380,7 @@ public class Blocks {
         }
 
         private void checkClosed() {
-            if (isNull(inner)) {
+            if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("BlockSpentOutputs has been closed");
             }
         }

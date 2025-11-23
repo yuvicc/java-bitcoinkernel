@@ -48,9 +48,9 @@ tasks.register('buildBitcoinCore', Exec) {
             '-DENABLE_IPC=OFF'
 
     // Only run if build directory doesn't exist or header has changed
-//    inputs.file bitcoinKernelHeader
-//    inputs.dir "${bitcoinCoreDir}/src"
-//    outputs.dir bitcoinBuildDir
+    inputs.file bitcoinKernelHeader
+    inputs.dir "${bitcoinCoreDir}/src/kernel"
+    outputs.dir bitcoinBuildDir
 }
 
 // Task to compile the built Bitcoin Core
@@ -58,13 +58,16 @@ tasks.register('compileBitcoinCore', Exec) {
     dependsOn buildBitcoinCore
     workingDir bitcoinCoreDir
 
-    // todo: add more robust approach here for compiling parallelly, for now I have kept it low(we can use nproc here but it crashes my machine)
-    commandLine 'cmake', '--build', 'build', '-j4'
+    // Use available CPU cores for parallel compilation (limit to 75% to avoid system freeze)
+    def cpuCount = Math.max(1, (int)(Runtime.runtime.availableProcessors() * 0.75))
+    commandLine 'cmake', '--build', 'build', "-j${cpuCount}"
 
-//    inputs.dir bitcoinBuildDir
-//    outputs.files(
-//            "${bitcoinBuildDir}/src/kernel/libbitcoinkernel.so",
-//    )
+    inputs.dir bitcoinBuildDir
+    outputs.files(
+            "${bitcoinBuildDir}/lib/libbitcoinkernel.so",
+            "${bitcoinBuildDir}/lib/libbitcoinkernel.dylib",
+            "${bitcoinBuildDir}/lib/libbitcoinkernel.dll"
+    )
 }
 compileBitcoinCore.dependsOn(buildBitcoinCore)
 
@@ -77,12 +80,14 @@ sourceSets {
     }
 }
 
-application {
-    mainClass = "org.bitcoinkernel.TestKernel"
-    applicationDefaultJvmArgs = [
-            "--enable-native-access=ALL-UNNAMED"
-    ]
-}
+// Note: This is a library, not an application.
+// Remove the application plugin configuration or create an example main class.
+// application {
+//     mainClass = "org.bitcoinkernel.Example"
+//     applicationDefaultJvmArgs = [
+//             "--enable-native-access=ALL-UNNAMED"
+//     ]
+// }
 
 // Ensure proper build order
 compileJava.dependsOn compileBitcoinCore

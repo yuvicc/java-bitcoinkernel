@@ -1,7 +1,5 @@
 package org.bitcoinkernel;
 
-import com.sun.source.tree.BlockTree;
-
 import java.lang.foreign.*;
 import java.nio.charset.StandardCharsets;
 import java.util.Iterator;

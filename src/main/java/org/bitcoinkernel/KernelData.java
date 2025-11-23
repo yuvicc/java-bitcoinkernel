@@ -98,8 +98,33 @@ public class KernelData {
 
         public byte[] toBytes() {
             checkClosed();
-            // This would require implementing a callback writer
-            throw new UnsupportedOperationException("ScriptPubkey serialization not yet implemented");
+
+            try (var arena = Arena.ofConfined()) {
+                // Create a container to collect bytes
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+
+                // Create the writer callback
+                org.bitcoinkernel.jextract.btck_WriteBytes.Function writer = (bytes, size, userData) -> {
+                    try {
+                        byte[] data = bytes.reinterpret(size).toArray(ValueLayout.JAVA_BYTE);
+                        baos.write(data);
+                        return 0; // success
+                    } catch (Exception e) {
+                        return 1; // error
+                    }
+                };
+
+                MemorySegment writerSegment = org.bitcoinkernel.jextract.btck_WriteBytes.allocate(writer, arena);
+
+                int result = btck_script_pubkey_to_bytes(inner, writerSegment, MemorySegment.NULL);
+                if (result != 0) {
+                    throw new RuntimeException("Failed to serialize ScriptPubkey");
+                }
+
+                return baos.toByteArray();
+            } catch (Exception e) {
+                throw new RuntimeException("Failed to serialize ScriptPubkey", e);
+            }
         }
 
         public ScriptPubkey copy() {
