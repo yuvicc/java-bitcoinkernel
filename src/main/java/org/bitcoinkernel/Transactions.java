@@ -84,7 +84,7 @@ public class Transactions {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
             if (inner != MemorySegment.NULL) {
                 btck_transaction_destroy(inner);
                 inner = MemorySegment.NULL;
@@ -264,7 +264,7 @@ public class Transactions {
         }
 
         @Override
-        public void close() throws Exception {
+        public void close() {
             if (inner != MemorySegment.NULL && ownsMemory) {
                 btck_transaction_output_destroy(inner);
                 inner = MemorySegment.NULL;
