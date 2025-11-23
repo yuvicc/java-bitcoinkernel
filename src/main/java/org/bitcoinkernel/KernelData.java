@@ -49,14 +49,19 @@ public class KernelData {
             txTo.checkClosed();
 
             try (var arena = Arena.ofConfined()) {
-                // Allocate array of output pointers
-                MemorySegment outputPtrs = arena.allocate(
-                    ValueLayout.ADDRESS,
-                    spentOutputs.length
-                );
+                // Prepare spent outputs array
+                int numOutputs = (spentOutputs != null) ? spentOutputs.length : 0;
+                MemorySegment outputPtrs;
 
-                for (int i = 0; i < spentOutputs.length; i++) {
-                    outputPtrs.setAtIndex(ValueLayout.ADDRESS, i, spentOutputs[i].getInner());
+                if (numOutputs > 0) {
+                    // Allocate array of output pointers
+                    outputPtrs = arena.allocate(ValueLayout.ADDRESS, numOutputs);
+                    for (int i = 0; i < spentOutputs.length; i++) {
+                        outputPtrs.setAtIndex(ValueLayout.ADDRESS, i, spentOutputs[i].getInner());
+                    }
+                } else {
+                    // Pass NULL for empty/null spent outputs
+                    outputPtrs = MemorySegment.NULL;
                 }
 
                 MemorySegment statusPtr = arena.allocate(ValueLayout.JAVA_BYTE);
@@ -66,13 +71,14 @@ public class KernelData {
                     amount,
                     txTo.getInner(),
                     outputPtrs,
-                    spentOutputs.length,
+                    numOutputs,
                     inputIndex,
                     flags,
                     statusPtr
                 );
 
-                if (result != 0) {
+                // Note: return value 1 = success, 0 = error
+                if (result == 0) {
                     byte status = statusPtr.get(ValueLayout.JAVA_BYTE, 0);
                     throw new KernelTypes.KernelException(
                         KernelTypes.KernelException.ScriptVerifyError.fromNative(status)

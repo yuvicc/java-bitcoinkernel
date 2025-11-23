@@ -3,6 +3,15 @@ plugins {
     id 'application'
 }
 
+dependencies {
+    // JSON processing
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(24)
@@ -22,10 +31,24 @@ def bitcoinKernelHeader = file("${bitcoinCoreDir}/src/kernel/bitcoinkernel.h")
 tasks.register('buildBitcoinCore', Exec) {
     workingDir bitcoinCoreDir
 
-    // Configure Bitcoin Core build
+    // Configure Bitcoin Core build (matching rust-bitcoinkernel approach)
     commandLine 'cmake', '-B', 'build',
+            '-DCMAKE_BUILD_TYPE=RelWithDebInfo',
             '-DBUILD_KERNEL_LIB=ON',
-            '-DBUILD_UTIL_CHAINSTATE=ON'
+            '-DBUILD_TESTS=OFF',
+            '-DBUILD_KERNEL_TEST=OFF',
+            '-DBUILD_TX=OFF',
+            '-DBUILD_WALLET_TOOL=OFF',
+            '-DENABLE_WALLET=OFF',
+            '-DENABLE_EXTERNAL_SIGNER=OFF',
+            '-DBUILD_UTIL=OFF',
+            '-DBUILD_BITCOIN_BIN=OFF',
+            '-DBUILD_DAEMON=OFF',
+            '-DBUILD_UTIL_CHAINSTATE=OFF',
+            '-DBUILD_CLI=OFF',
+            '-DBUILD_SHARED_LIBS=ON',
+            '-DCMAKE_INSTALL_LIBDIR=lib',
+            '-DENABLE_IPC=OFF'
 
     // Only run if build directory doesn't exist or header has changed
 //    inputs.file bitcoinKernelHeader
@@ -66,3 +89,61 @@ application {
 
 // Ensure proper build order
 compileJava.dependsOn compileBitcoinCore
+
+// Configure test task
+test {
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+    }
+}
+
+// Task to run conformance handler
+tasks.register('conformanceHandler', Exec) {
+    group = 'conformance'
+    description = 'Run the conformance test handler (reads from stdin, writes to stdout)'
+
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'org.bitcoinkernel.conformance.ConformanceTestHandler'
+
+    // Required for FFM
+    jvmArgs = ['--enable-native-access=ALL-UNNAMED']
+
+    // Connect stdin/stdout
+    standardInput = System.in
+    standardOutput = System.out
+    standardError = System.err
+}
+
+// Build uber JAR with all dependencies
+tasks.register('buildConformanceJar', Jar) {
+    group = 'conformance'
+    description = 'Build standalone conformance handler JAR with all dependencies'
+
+    archiveBaseName = 'java-bitcoinkernel-conformance-handler'
+    archiveVersion = '0.1.0'
+
+    from sourceSets.main.output
+
+    // Include all dependencies
+    from {
+        configurations.runtimeClasspath.collect {
+            it.isDirectory() ? it : zipTree(it)
+        }
+    }
+
+    // Avoid duplicate files
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    manifest {
+        attributes(
+                'Main-Class': 'org.bitcoinkernel.conformance.ConformanceTestHandler',
+                'Implementation-Title': 'Java Bitcoin Kernel Conformance Handler',
+                'Implementation-Version': archiveVersion.get()
+        )
+    }
+}
+
+// Make conformance JAR depend on compilation
+buildConformanceJar.dependsOn compileJava

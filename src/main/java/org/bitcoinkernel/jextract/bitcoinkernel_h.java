@@ -20,8 +20,25 @@ public class bitcoinkernel_h extends bitcoinkernel_h$shared {
 
     static final Arena LIBRARY_ARENA = Arena.ofAuto();
 
-    static final SymbolLookup SYMBOL_LOOKUP = SymbolLookup.loaderLookup()
-            .or(Linker.nativeLinker().defaultLookup());
+    static final SymbolLookup SYMBOL_LOOKUP;
+
+    static {
+        // Load the bitcoinkernel library
+        SymbolLookup lookup = null;
+        try {
+            System.loadLibrary("bitcoinkernel");
+            lookup = SymbolLookup.loaderLookup();
+        } catch (UnsatisfiedLinkError e) {
+            // Fall back to default lookup (LD_LIBRARY_PATH)
+            System.err.println("Warning: Could not load libbitcoinkernel via System.loadLibrary, trying LD_LIBRARY_PATH");
+        }
+
+        if (lookup == null) {
+            lookup = Linker.nativeLinker().defaultLookup();
+        }
+
+        SYMBOL_LOOKUP = lookup;
+    }
 
     private static final int __WORDSIZE = (int)64L;
     /**
