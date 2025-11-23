@@ -5,7 +5,6 @@
 ## ⚠️ Status
 
 This library is **alpha**—under work in progress. APIs may change and functionality is still incomplete. Contributions and bug reports are welcome!
-You can check out this [PR](https://github.com/yuvicc/java-bitcoinkernel/pull/4) section for more details.
 
 ## Overview
 
@@ -17,10 +16,6 @@ You can check out this [PR](https://github.com/yuvicc/java-bitcoinkernel/pull/4)
 - Block validation - todo
 - Clean Java-native bindings via FFM with minimal overhead
 
-## Building
-
-We vendor Bitcoin Core’s `libbitcoinkernel` using a Git subtree targeting the `kernelApi` branch from your fork:
-
 ```bash
 git subtree pull \
   --prefix bitcoinkernel/bitcoin \
@@ -30,9 +25,8 @@ git subtree pull \
 
 ## Requirements
 - CMake
-- C++17 compiler (e.g. GCC/Clang)
-- Boost
-- JDK 25+ with FFM support
+- C++20 compiler (for compiling Bitcoin Core)
+- JDK 25 for compiling Java
 
 Refer to Bitcoin Core [docs](https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md) for dependency specifics.
 
