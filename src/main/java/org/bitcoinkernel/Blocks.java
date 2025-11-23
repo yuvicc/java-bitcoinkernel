@@ -279,7 +279,7 @@ public class Blocks {
             this.arena = Arena.ofConfined();
             MemorySegment blockSegment = arena.allocateFrom(ValueLayout.JAVA_BYTE, raw_block);
             this.inner = btck_block_create(blockSegment, blockSegment.byteSize());
-            if (inner == MemorySegment.NULL) {
+            if (inner == MemorySegment.NULL || inner.address() == 0) {
                 arena.close();
                 throw new KernelTypes.KernelException("Failed to create block");
             }

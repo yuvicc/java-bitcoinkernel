@@ -304,7 +304,7 @@ public class Chainstate {
             if (entry == MemorySegment.NULL) {
                 throw new IllegalArgumentException("No entry at height: " + height);
             }
-            return new BlockTreeEntry(inner);
+            return new BlockTreeEntry(entry);
         }
 
         public boolean contains(BlockTreeEntry entry) {

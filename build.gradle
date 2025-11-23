@@ -94,4 +94,19 @@ test {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
     }
+
+    // Set library path for native library loading (must be absolute path)
+    def libPath = file("${bitcoinCoreDir}/build/lib").absolutePath
+
+    // Set java.library.path via JVM args (more reliable than systemProperty)
+    jvmArgs "-Djava.library.path=${libPath}"
+
+    // Enable native access for Foreign Function & Memory API
+    jvmArgs "--enable-native-access=ALL-UNNAMED"
+
+    // Set LD_LIBRARY_PATH environment variable
+    environment "LD_LIBRARY_PATH", libPath
+
+    // Ensure dependency on Bitcoin Core compilation
+    dependsOn compileBitcoinCore
 }

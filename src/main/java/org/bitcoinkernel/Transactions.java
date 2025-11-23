@@ -13,13 +13,19 @@ public class Transactions {
     public static class Transaction implements AutoCloseable {
         private MemorySegment inner;
         private final Arena arena;
+        private final boolean ownsMemory;
 
         Transaction(MemorySegment inner) {
+            this(inner, false);
+        }
+
+        Transaction(MemorySegment inner, boolean ownsMemory) {
             if (inner == MemorySegment.NULL) {
                 throw new IllegalStateException("Transaction Object cannot be null");
             }
             this.inner = inner;
             this.arena = null;
+            this.ownsMemory = ownsMemory;
         }
 
         public Transaction(byte[] rawTransaction) throws IllegalArgumentException {
@@ -33,6 +39,7 @@ public class Transactions {
                 arena.close();
                 throw new IllegalArgumentException("Failed to create Transaction from raw data");
             }
+            this.ownsMemory = true;
         }
 
         public Transaction copy() {
@@ -41,7 +48,7 @@ public class Transactions {
             if (copied == MemorySegment.NULL) {
                 throw new RuntimeException("Failed to copy Transaction");
             }
-            return new Transaction(copied);
+            return new Transaction(copied, true);
         }
 
         public long countInputs() {
@@ -85,7 +92,7 @@ public class Transactions {
 
         @Override
         public void close() {
-            if (inner != MemorySegment.NULL) {
+            if (inner != MemorySegment.NULL && ownsMemory) {
                 btck_transaction_destroy(inner);
                 inner = MemorySegment.NULL;
             }

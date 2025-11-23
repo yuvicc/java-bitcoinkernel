@@ -26,11 +26,11 @@ public class bitcoinkernel_h extends bitcoinkernel_h$shared {
         // Load the bitcoinkernel library
         SymbolLookup lookup = null;
         try {
-            System.loadLibrary("libbitcoinkernel");
+            System.loadLibrary("bitcoinkernel");
             lookup = SymbolLookup.loaderLookup();
         } catch (UnsatisfiedLinkError e) {
             // Fall back to default lookup (LD_LIBRARY_PATH)
-            System.err.println("Warning: Could not load libbitcoinkernel via System.loadLibrary, trying LD_LIBRARY_PATH");
+            System.err.println("Warning: Could not load bitcoinkernel via System.loadLibrary, trying LD_LIBRARY_PATH");
         }
 
         if (lookup == null) {

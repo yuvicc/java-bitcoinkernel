@@ -48,6 +48,13 @@ public class KernelData {
             checkClosed();
             txTo.checkClosed();
 
+            // Bounds check input_index to prevent assertion failure in native code
+            if (inputIndex < 0 || inputIndex >= txTo.countInputs()) {
+                throw new IndexOutOfBoundsException(
+                    "Input index " + inputIndex + " is out of bounds for transaction with " +
+                    txTo.countInputs() + " inputs");
+            }
+
             try (var arena = Arena.ofConfined()) {
                 // Prepare spent outputs array
                 int numOutputs = (spentOutputs != null) ? spentOutputs.length : 0;
