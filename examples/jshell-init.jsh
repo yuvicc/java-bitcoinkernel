@@ -67,10 +67,6 @@ List<byte[]> loadBlockData(String filepath) throws IOException {
 }
 
 // Helper function: Create a temporary Bitcoin Kernel instance for testing
-BitcoinKernel createTempKernel() throws Exception {
-    return createTempKernel(ChainType.REGTEST);
-}
-
 BitcoinKernel createTempKernel(ChainType chainType) throws Exception {
     Path tempDir = Files.createTempDirectory("bitcoin-kernel-jshell");
     Path blocksDir = tempDir.resolve("blocks");
@@ -84,6 +80,10 @@ BitcoinKernel createTempKernel(ChainType chainType) throws Exception {
         blocksDir,
         msg -> System.out.println("[Kernel] " + msg)
     );
+}
+
+BitcoinKernel createTempKernel() throws Exception {
+    return createTempKernel(ChainType.REGTEST);
 }
 
 // Helper function: Create a kernel with specific data directory

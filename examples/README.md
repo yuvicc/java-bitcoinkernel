@@ -25,19 +25,29 @@ JShell provides an interactive REPL (Read-Eval-Print Loop) for quick testing and
 
 ### Starting JShell
 
+**Option 1: Using the provided script (Recommended)**
+
+```bash
+./examples/jshell-run.sh
+```
+
+This script automatically sets up the environment and launches JShell with all necessary configurations.
+
+**Option 2: Manual command**
+
+Set the library path and run JShell:
+
 ```bash
 # From the project root directory
+# First, set the library path
+export LD_LIBRARY_PATH=bitcoinkernel/bitcoin/build/lib:$LD_LIBRARY_PATH
+
+# Then start JShell
 jshell --class-path build/libs/java-bitcoinkernel.jar:build/classes/java/main \
        --enable-native-access=ALL-UNNAMED \
        -J-Djava.library.path=bitcoinkernel/bitcoin/build/lib \
        -R--enable-native-access=ALL-UNNAMED \
        examples/jshell-init.jsh
-```
-
-Or use the provided script:
-
-```bash
-./examples/jshell-run.sh
 ```
 
 ### JShell Quick Start
@@ -232,8 +242,6 @@ See the following example files:
 
 - **`BasicBlockProcessing.java`** - Process blocks and manage chainstate
 - **`ScriptVerification.java`** - Verify transaction scripts
-- **`ChainExploration.java`** - Iterate through the blockchain
-- **`TransactionAnalysis.java`** - Analyze transaction data
 
 Each example can be run independently:
 
