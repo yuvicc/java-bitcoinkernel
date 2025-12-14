@@ -23,8 +23,8 @@ This library is **alpha** - under active development. APIs may change and functi
 ## Requirements
 
 - **JDK 25+** (for FFM API support)
-- **CMake 3.16+** fore Bitcoin Core compiling
-- **C++20** for Bitcoin Core compiling
+- **CMake 3.22+** for Bitcoin Core compiling
+- **Cpp compiler** for Bitcoin Core compiling
 - **Boost libraries** - see Bitcoin Core [build documentation](https://github.com/bitcoin/bitcoin/blob/master/doc/build-unix.md)
 
 ## Quick Start
