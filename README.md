@@ -1,6 +1,6 @@
-# Java-Bitcoinkernel ⚠️🚧
+# Bitcoinkernel-JDK ⚠️🚧
 
-> Java FFM wrapper for Bitcoin Core's validation engine via [libbitcoinkernel](https://github.com/bitcoin/bitcoin/pull/30595)
+> Java/JDK FFM wrapper for Bitcoin Core's validation engine via [libbitcoinkernel](https://github.com/bitcoin/bitcoin/pull/30595)
 
 ## ⚠️ Status
 
@@ -8,7 +8,7 @@ This library is **alpha** - under active development. APIs may change and functi
 
 ## Overview
 
-`java-bitcoinkernel` uses Java's Foreign Function & Memory API (FFM) to call into Bitcoin Core's `libbitcoinkernel`, exposing core functionalities—including block & transaction validation, chainstate management, and block data access—through a safe and idiomatic Java interface.
+`bitcoinkernel-jdk` uses Java's Foreign Function & Memory API (FFM) to call into Bitcoin Core's `libbitcoinkernel`, exposing core functionalities—including block & transaction validation, chainstate management, and block data access—through a safe and idiomatic JVM interface.
 
 ### Features
 
@@ -33,8 +33,8 @@ This library is **alpha** - under active development. APIs may change and functi
 
 ```bash
 # Clone repository with submodules
-git clone --recursive https://github.com/yuvicc/java-bitcoinkernel
-cd java-bitcoinkernel
+git clone --recursive https://github.com/yuvicc/bitcoinkernel-jdk
+cd bitcoinkernel-jdk
 
 # Build (this will automatically build libbitcoinkernel)
 ./gradlew build
