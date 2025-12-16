@@ -420,4 +420,34 @@ public class Blocks {
             }
         }
     }
+
+    public static class BlockHeader implements AutoCloseable {
+        private MemorySegment inner;
+        private final Arena arena;
+
+        public BlockHeader(byte[] raw_block_header) {
+            this.arena = Arena.ofConfined();
+            MemorySegment headerSegment = arena.allocateFrom(ValueLayout.JAVA_BYTE, raw_block_header);
+            this.inner = btck_block_header_create();
+            if (isNull(inner)) {
+                arena.close();
+                throw new KernelTypes.KernelException("Failed to create block");
+            }
+        }
+
+        BlockHeader(MemorySegment inner) {
+            this.inner = inner;
+        }
+
+        @Override
+        public void close() {
+            if (inner != MemorySegment.NULL) {
+                btck_block_header_destroy(inner);
+                inner = MemorySegment.NULL;
+            }
+            if (arena != null) {
+                arena.close();
+            }
+        }
+    }
 }

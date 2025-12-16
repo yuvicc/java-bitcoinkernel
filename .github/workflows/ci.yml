@@ -67,6 +67,12 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-bitcoinkernel-
 
+      - name: Clean stale CMake cache
+        run: |
+          if [ -f bitcoinkernel/bitcoin/build/CMakeCache.txt ]; then
+            rm -f bitcoinkernel/bitcoin/build/CMakeCache.txt
+          fi
+
       - name: Build bitcoinkernel
         run: |
           cd bitcoinkernel/bitcoin
